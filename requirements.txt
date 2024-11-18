@@ -1,0 +1,5 @@
+Flask
+Flask-Limiter
+python-dotenv
+appwrite
+gunicorn
