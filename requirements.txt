@@ -3,3 +3,4 @@ Flask-Limiter
 python-dotenv
 appwrite
 gunicorn
+beautifulsoup4

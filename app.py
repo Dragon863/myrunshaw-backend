@@ -10,6 +10,8 @@ from flask_limiter.util import get_remote_address
 from appwrite.client import Client
 from appwrite.services.account import Account
 from appwrite.services.users import Users
+from bus_worker import main as worker_main
+from threading import Thread
 
 dotenv.load_dotenv()
 
@@ -287,7 +289,17 @@ def get_timetable():
     return jsonify({"timetable": json.loads(timetable["timetable"])})
 
 
+@app.route("/api/bus", methods=["GET"])
+@authenticate
+@limiter.limit("20/minute")
+def get_bus():
+    return jsonify({"error": "Bus API not implemented yet"}), 501
+
+
 if __name__ == "__main__":
     init_db()
     init_timetable_db()
+    # Also run main() from bus_worker.py here as a thread in the background
+    worker_thread = Thread(target=worker_main)
+    worker_thread.start()
     app.run(debug=False)
