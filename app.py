@@ -20,6 +20,7 @@ limiter = Limiter(get_remote_address, app=app)
 
 DATABASE = "data/friends.db"
 TIMETABLE_DATABASE = "data/timetables.db"
+BUS_DATABASE = "data/bus.db"
 
 # Initialize Appwrite client
 client = Client()
@@ -86,6 +87,14 @@ def get_timetable_db():
         g.timetable_db = sqlite3.connect(TIMETABLE_DATABASE)
         g.timetable_db.row_factory = sqlite3.Row
     return g.timetable_db
+
+
+def get_bus_db():
+    """Also reuse bus database connection during request lifetime - wow such efficiency!"""
+    if "bus_db" not in g:
+        g.bus_db = sqlite3.connect(BUS_DATABASE)
+        g.bus_db.row_factory = sqlite3.Row
+    return g.bus_db
 
 
 @app.teardown_appcontext
@@ -293,7 +302,9 @@ def get_timetable():
 @authenticate
 @limiter.limit("20/minute")
 def get_bus():
-    return jsonify({"error": "Bus API not implemented yet"}), 501
+    with get_bus_db() as db:
+        buses = db.execute("SELECT * FROM bus").fetchall()
+    return jsonify([dict(bus) for bus in buses])
 
 
 if __name__ == "__main__":
