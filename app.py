@@ -11,6 +11,7 @@ from appwrite.client import Client
 from appwrite.services.account import Account
 from appwrite.services.users import Users
 from bus_worker import main as worker_main
+from bus_worker import sendNotification
 from threading import Thread
 
 dotenv.load_dotenv()
@@ -168,6 +169,12 @@ def send_friend_request():
                 (request.user_id, receiver_id),
             )
             db.commit()
+            sendNotification(
+                "You have a new friend request!",
+                [receiver_id],
+                "Friend Request",
+                ttl=60 * 60 * 24 * 2,
+            )
         return jsonify({"message": "Friend request sent"}), 201
     except sqlite3.IntegrityError as e:
         app.logger.error(f"Database integrity error: {e}")
@@ -212,6 +219,13 @@ def handle_friend_request(request_id):
         if req["status"] != "pending":
             return jsonify({"error": "Request already handled"}), 400
 
+        sendNotification(
+            f"Your friend request has been {action}ed!",
+            [req["sender_id"]],
+            "Friend Request",
+            ttl=60 * 60 * 24 * 2,
+        )
+
         db.execute(
             """UPDATE friend_requests 
                SET status = ?, updated_at = ? 
@@ -239,7 +253,6 @@ def get_friends():
 
 """
 **Timetable Routes**
-
 The following routes are used to upload and retrieve timetables for users. The timetable is stored in a separate database to keep the main database clean and to allow for easier scaling in the future if necessary :)
 """
 

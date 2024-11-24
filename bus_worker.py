@@ -1,9 +1,17 @@
 from datetime import datetime
 import time
 import sqlite3
+import os
 import requests
 from bs4 import BeautifulSoup
 import re as regex
+import dotenv
+import onesignal
+from onesignal.api import default_api
+from onesignal.model.notification import Notification
+from onesignal.model.filter import Filter
+
+dotenv.load_dotenv()
 
 
 DATABASE = "data/bus.db"
@@ -23,8 +31,45 @@ CREATE TABLE IF NOT EXISTS bus (
 """
 )
 
-
 database = sqlite3.connect(DATABASE)
+
+onesignal_configuration = onesignal.Configuration(
+    app_key=os.environ.get("ONESIGNAL_API_KEY"),
+    # user_key=os.environ.get("ONESIGNAL_USER_KEY"),
+)
+onesignal_api = default_api.DefaultApi(
+    onesignal.ApiClient(configuration=onesignal_configuration)
+)
+
+
+def sendNotification(
+    message,
+    userIds,
+    title: str,
+    ttl: int = 60 * 10,
+    filter: Filter = None,
+    icon: str = "ic_stat_onesignal_default",
+    channel: str = os.getenv("ONESIGNAL_GENERIC_CHANNEL"),
+):
+    """
+    message: str = The message to send to the user
+    userIds: list<str> = The user IDs to send the message to (these are the external user IDs from appwrite i.e. student IDs)
+    ttl: int = The time to live for the notification in seconds, 10 minutes is reasonable for a bus notification
+    headings: dict = The headings for the notification, this is optional and will default to the message if not provided
+    """
+    notification = Notification(
+        app_id=os.environ.get("ONESIGNAL_APP_ID"),
+        contents={"en": message},
+        include_external_user_ids=userIds,
+        ttl=ttl,
+        headings={"en": title},
+        filters=[filter] if filter else None,
+        android_channel_id=channel,
+        small_icon=icon,
+        android_accent_color="#E63009",
+    )
+
+    onesignal_api.create_notification(notification)
 
 
 def parseSite():
@@ -69,7 +114,32 @@ def parseSite():
                 (bus_id, bus_bay),
             )
 
+    cursor.execute("SELECT bus_id, bus_bay FROM bus")
+    old_data = {row[0]: row[1] for row in cursor.fetchall()}
+
     conn.commit()
+
+    cursor.execute("SELECT bus_id, bus_bay FROM bus")
+    new_data = {row[0]: row[1] for row in cursor.fetchall()}
+
+    changed_buses = [
+        (bus_id, old_data[bus_id], new_data[bus_id])
+        for bus_id in new_data
+        if bus_id in old_data and old_data[bus_id] != new_data[bus_id]
+    ]
+
+    if changed_buses:
+        for bus_id, old_bay, new_bay in changed_buses:
+            if new_bay != "0":
+                print(f"Bus {bus_id} changed from bay {old_bay} to bay {new_bay}")
+                sendNotification(
+                    f"Your bus has arrived in bay {new_bay}",
+                    [bus_id],
+                    "Bus Update!",
+                    filter=Filter(field="tag", key="bus", relation="=", value=bus_id),
+                    channel=os.getenv("ONESIGNAL_BUS_CHANNEL"),
+                    icon="ic_stat_onesignal_bus",
+                )
 
 
 def main():
