@@ -16,7 +16,7 @@ dotenv.load_dotenv()
 
 DATABASE = "data/bus.db"
 BASE_URL = "https://webservices.runshaw.ac.uk/bus/busdepartures.aspx"
-DEBUG = False
+DEBUG = True
 
 conn = sqlite3.connect(DATABASE, check_same_thread=False)
 cursor = conn.cursor()
@@ -24,9 +24,8 @@ cursor = conn.cursor()
 conn.execute(
     """
 CREATE TABLE IF NOT EXISTS bus (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    bus_id TEXT NOT NULL,
-    bus_bay TEXT NOT NULL
+    bus_id TEXT PRIMARY KEY,
+    bus_bay TEXT NOT NULL DEFAULT '0'
 )
 """
 )
@@ -44,12 +43,13 @@ onesignal_api = default_api.DefaultApi(
 
 def sendNotification(
     message,
-    userIds,
-    title: str,
+    userIds: list = [],
+    title: str = "Notification",
     ttl: int = 60 * 10,
     filter: Filter = None,
     icon: str = "ic_stat_onesignal_default",
     channel: str = os.getenv("ONESIGNAL_GENERIC_CHANNEL"),
+    priority: int = 10,
 ):
     """
     message: str = The message to send to the user
@@ -66,10 +66,11 @@ def sendNotification(
         filters=[filter] if filter else None,
         android_channel_id=channel,
         small_icon=icon,
-        android_accent_color="#E63009",
+        android_accent_color="E63009",
     )
 
-    onesignal_api.create_notification(notification)
+    response = onesignal_api.create_notification(notification)
+    print(response)
 
 
 def parseSite():
@@ -80,75 +81,61 @@ def parseSite():
 
     soup = BeautifulSoup(response.content, "html.parser")
 
-    """
-    Example HTML:
-    <tr>
-        <td>762</td> <- this is the bus ID, it will be three numbers (sometimes followed by a letter)
-        <td>B12</td> <- this is the bay number, it will eiter be blank or a letter followed by a one or two digit number
-    </tr>
-
-    or for a bus that is not in a bay:
-    <tr>
-        <td>150B</td>
-        <td></td> <- this cell will be empty, or may have a space in it
-    </tr>
-    """
-
-    for row in soup.find_all("tr"):
-        cells = row.find_all("td")
-        if len(cells) == 2:
-            bus_id = cells[0].text
-            bus_bay = cells[1].text
-
-            if not regex.match(r"^\d{3,4}[A-Z]*$", bus_id):
-                continue
-
-            if bus_bay in ["", " "]:
-                bus_bay = "0"
-
-            if not regex.match(r"^[A-Z]?\d{1,2}$", bus_bay):
-                continue
-
-            cursor.execute(
-                "INSERT INTO bus (bus_id, bus_bay) VALUES (?, ?)",
-                (bus_id, bus_bay),
-            )
-
     cursor.execute("SELECT bus_id, bus_bay FROM bus")
     old_data = {row[0]: row[1] for row in cursor.fetchall()}
 
+    new_data = {}
+
+    for row in soup.find_all("tr"):
+        cells = row.find_all("td")
+        if len(cells) > 0:
+            bus_id = cells[0].text.strip()
+            bus_bay = cells[2].text.strip()
+
+            # Validate bus_id - it's usually 3 digits, followed by optional letters
+            if not regex.match(r"^\d{3,4}[A-Z]*$", bus_id):
+                continue
+
+            # Normalize empty or invalid bays to "0", meaning the bus is not in a bay :)
+            if bus_bay in ["", " "] or not regex.match(r"^[A-Z]?\d{1,2}$", bus_bay):
+                bus_bay = "0"
+
+            # Save new data so we can check for a change (i.e.. bus arrives)
+            new_data[bus_id] = bus_bay
+
+            # This is basically just an upsert
+            cursor.execute(
+                "INSERT OR REPLACE INTO bus (bus_id, bus_bay) VALUES (?, ?)",
+                (bus_id, bus_bay),
+            )
+
     conn.commit()
 
-    cursor.execute("SELECT bus_id, bus_bay FROM bus")
-    new_data = {row[0]: row[1] for row in cursor.fetchall()}
+    # Compare old and new data to identify changes
+    for bus_id, new_bay in new_data.items():
+        old_bay = old_data.get(bus_id, "0")  # Default to "0" for new entries
 
-    changed_buses = [
-        (bus_id, old_data[bus_id], new_data[bus_id])
-        for bus_id in new_data
-        if bus_id in old_data and old_data[bus_id] != new_data[bus_id]
-    ]
+        # Check if bay has changed, also we should probably ignore transitions to "0"
+        if old_bay != new_bay and new_bay != "0":
+            print(f"Bus {bus_id} changed from bay {old_bay} to bay {new_bay}")
 
-    if changed_buses:
-        for bus_id, old_bay, new_bay in changed_buses:
-            if new_bay != "0":
-                print(f"Bus {bus_id} changed from bay {old_bay} to bay {new_bay}")
-                sendNotification(
-                    f"Your bus has arrived in bay {new_bay}",
-                    [bus_id],
-                    "Bus Update!",
-                    filter=Filter(field="tag", key="bus", relation="=", value=bus_id),
-                    channel=os.getenv("ONESIGNAL_BUS_CHANNEL"),
-                    icon="ic_stat_onesignal_bus",
-                )
+            # Pinnnngg!
+            sendNotification(
+                f"The {bus_id} bus has arrived in bay {new_bay}",
+                title="Bus Update!",
+                filter=Filter(field="tag", key="bus", relation="=", value=bus_id),
+                channel=os.getenv("ONESIGNAL_BUS_CHANNEL"),
+                icon="ic_stat_onesignal_bus",
+            )
 
 
 def main():
     while True:
-        # Parse the site every 10 seconds between 15:00 and 16:30, then reset all buses to bay 0 at midnight
+        # Parse the site every 10 seconds between 15:00 and 17:00, then reset all buses to bay 0 at midnight because that's when runshaw does it
         current_time = datetime.now()
         if current_time.hour == 0 and current_time.minute == 0:
             cursor.execute("UPDATE bus SET bus_bay = '0'")
             conn.commit()
-        elif (current_time.hour == 15 and 0 <= current_time.minute <= 30) or DEBUG:
+        elif (current_time.hour in [15, 16]) or DEBUG:
             parseSite()
-        time.sleep(10)
+            time.sleep(10)

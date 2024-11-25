@@ -170,9 +170,9 @@ def send_friend_request():
             )
             db.commit()
             sendNotification(
-                "You have a new friend request!",
-                [receiver_id],
-                "Friend Request",
+                message="You have a new friend request!",
+                userIds=[receiver_id],
+                title="Friend Request",
                 ttl=60 * 60 * 24 * 2,
             )
         return jsonify({"message": "Friend request sent"}), 201
@@ -220,9 +220,9 @@ def handle_friend_request(request_id):
             return jsonify({"error": "Request already handled"}), 400
 
         sendNotification(
-            f"Your friend request has been {action}ed!",
-            [req["sender_id"]],
-            "Friend Request",
+            message=f"Your friend request has been {action}ed!",
+            userIds=[req["sender_id"]],
+            title="Friend Request",
             ttl=60 * 60 * 24 * 2,
         )
 
