@@ -23,7 +23,6 @@ DATABASE = "data/friends.db"
 TIMETABLE_DATABASE = "data/timetables.db"
 BUS_DATABASE = "data/bus.db"
 
-# Initialize Appwrite client
 client = Client()
 client.set_endpoint(os.getenv("APPWRITE_ENDPOINT"))
 client.set_project(os.getenv("APPWRITE_PROJECT_ID"))

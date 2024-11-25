@@ -16,7 +16,7 @@ dotenv.load_dotenv()
 
 DATABASE = "data/bus.db"
 BASE_URL = "https://webservices.runshaw.ac.uk/bus/busdepartures.aspx"
-DEBUG = True
+DEBUG = False
 
 conn = sqlite3.connect(DATABASE, check_same_thread=False)
 cursor = conn.cursor()
