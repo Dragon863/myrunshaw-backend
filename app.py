@@ -325,4 +325,4 @@ if __name__ == "__main__":
     # Also run main() from bus_worker.py here as a thread in the background
     worker_thread = Thread(target=worker_main)
     worker_thread.start()
-    app.run(debug=False)
+    app.run(debug=False, host="0.0.0.0", port=int(os.getenv("PORT", 5005)))
