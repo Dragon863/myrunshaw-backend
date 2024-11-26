@@ -67,6 +67,7 @@ def sendNotification(
         android_channel_id=channel,
         small_icon=icon,
         android_accent_color="E63009",
+        is_android=True,
     )
 
     response = onesignal_api.create_notification(notification)
