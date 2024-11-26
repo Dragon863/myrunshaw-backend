@@ -47,7 +47,6 @@ def sendNotification(
     title: str = "Notification",
     ttl: int = 60 * 10,
     filter: Filter = None,
-    icon: str = "ic_stat_onesignal_default",
     channel: str = os.getenv("ONESIGNAL_GENERIC_CHANNEL"),
     priority: int = 10,
 ):
@@ -65,7 +64,6 @@ def sendNotification(
         headings={"en": title},
         filters=[filter] if filter else None,
         android_channel_id=channel,
-        small_icon=icon,
         android_accent_color="E63009",
         is_android=True,
     )
@@ -126,7 +124,6 @@ def parseSite():
                 title="Bus Update!",
                 filter=Filter(field="tag", key="bus", relation="=", value=bus_id),
                 channel=os.getenv("ONESIGNAL_BUS_CHANNEL"),
-                icon="ic_stat_onesignal_bus",
             )
 
 
