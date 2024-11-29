@@ -44,6 +44,34 @@ def init_db():
         """
         )
 
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            DELETE FROM friend_requests
+            WHERE id IN (
+                SELECT f1.id
+                FROM friend_requests f1
+                JOIN friend_requests f2
+                ON LOWER(f1.sender_id) = LOWER(f2.receiver_id)
+                AND LOWER(f1.receiver_id) = LOWER(f2.sender_id)
+                WHERE f1.id < f2.id
+            )
+        """
+        )
+        print("Reversed duplicate records removed.")
+
+        cursor.execute(
+            """
+            UPDATE friend_requests
+            SET sender_id = LOWER(sender_id),
+                receiver_id = LOWER(receiver_id)
+        """
+        )
+        print("All sender_id and receiver_id values have been updated to lowercase.")
+
+        # Commit the changes
+        conn.commit()
+
 
 def verify_token(token):
     """Verify Appwrite JWT token and extract user ID from itt"""
@@ -127,7 +155,7 @@ def authenticate(f):
         if not user_id:
             return jsonify({"error": "Unauthorized"}), 401
 
-        request.user_id = user_id
+        request.user_id = user_id.lower()
         return f(*args, **kwargs)
 
     return decorated_function
@@ -148,7 +176,7 @@ def send_friend_request():
     if not receiver_id:
         return jsonify({"error": "receiver_id is required"}), 400
 
-    if receiver_id == request.user_id:
+    if receiver_id == request.user_id.lower():
         return jsonify({"error": "Cannot send friend request to yourself"}), 400
 
     try:
@@ -165,12 +193,12 @@ def send_friend_request():
         with get_db() as db:
             db.execute(
                 "INSERT INTO friend_requests (sender_id, receiver_id) VALUES (?, ?)",
-                (request.user_id, receiver_id),
+                (request.user_id.lower(), receiver_id.lower()),
             )
             db.commit()
             sendNotification(
                 message="You have a new friend request!",
-                userIds=[receiver_id],
+                userIds=[receiver_id.lower()],
                 title="Friend Request",
                 ttl=60 * 60 * 24 * 2,
             )
@@ -190,7 +218,7 @@ def get_friend_requests():
         requests = db.execute(
             """SELECT * FROM friend_requests 
                WHERE receiver_id = ? AND status = ?""",
-            (request.user_id, status),
+            (request.user_id.lower(), status),
         ).fetchall()
 
     return jsonify([dict(req) for req in requests])
@@ -212,7 +240,7 @@ def handle_friend_request(request_id):
         if not req:
             return jsonify({"error": "Friend request not found"}), 404
 
-        if req["receiver_id"] != request.user_id:
+        if req["receiver_id"] != request.user_id.lower():
             return jsonify({"error": "Unauthorized"}), 403
 
         if req["status"] != "pending":
@@ -244,7 +272,7 @@ def get_friends():
         friends = db.execute(
             """SELECT * FROM friend_requests 
                WHERE (sender_id = ? OR receiver_id = ?) AND status = 'accepted'""",
-            (request.user_id, request.user_id),
+            (request.user_id.lower(), request.user_id.lower()),
         ).fetchall()
 
     return jsonify([dict(friend) for friend in friends])
@@ -271,7 +299,7 @@ def upload_timetable():
                    VALUES (?, ?) 
                    ON CONFLICT(user_id) 
                    DO UPDATE SET timetable = excluded.timetable, updated_at = CURRENT_TIMESTAMP""",
-                (request.user_id, json.dumps(timetable)),
+                (request.user_id.lower(), json.dumps(timetable)),
             )
             db.commit()
         return jsonify({"message": "Timetable uploaded successfully"}), 201
@@ -294,14 +322,19 @@ def get_timetable():
                    WHERE status = 'accepted' 
                    AND ((sender_id = ? AND receiver_id = ?) 
                         OR (sender_id = ? AND receiver_id = ?))""",
-                (request.user_id, user_id, user_id, request.user_id),
+                (
+                    request.user_id.lower(),
+                    user_id.lower(),
+                    user_id.lower(),
+                    request.user_id.lower(),
+                ),
             ).fetchone()
             if not friendship:
                 return jsonify({"error": "Unauthorized access"}), 403
 
     with get_timetable_db() as db:
         timetable = db.execute(
-            "SELECT timetable FROM timetables WHERE user_id = ?", (user_id,)
+            "SELECT timetable FROM timetables WHERE user_id = ?", (user_id.lower(),)
         ).fetchone()
 
     if not timetable:
