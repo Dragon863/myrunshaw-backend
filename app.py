@@ -13,10 +13,12 @@ from appwrite.services.users import Users
 from bus_worker import main as worker_main
 from bus_worker import sendNotification
 from threading import Thread
+from flask_cors import CORS
 
 dotenv.load_dotenv()
 
 app = Flask(__name__)
+CORS(app)
 limiter = Limiter(get_remote_address, app=app)
 
 DATABASE = "data/friends.db"
