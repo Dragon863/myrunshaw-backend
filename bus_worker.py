@@ -49,7 +49,7 @@ def sendNotification(
     userIds: list = [],
     title: str = "Notification",
     ttl: int = 60 * 10,
-    filter: Filter = None,
+    filters: list = [],
     channel: str = os.getenv("ONESIGNAL_GENERIC_CHANNEL"),
     priority: int = 10,
 ):
@@ -65,7 +65,7 @@ def sendNotification(
         include_external_user_ids=userIds,
         ttl=ttl,
         headings={"en": title},
-        filters=[filter] if filter else [],
+        filters=filters,
         android_channel_id=channel,
         android_accent_color="E63009",
         is_android=True,
@@ -125,7 +125,10 @@ def parseSite():
             sendNotification(
                 f"The {bus_id} bus has arrived in bay {new_bay}",
                 title="Bus Update!",
-                filter=Filter(field="tag", key="bus", relation="=", value=bus_id),
+                filters=[
+                    Filter(field="tag", key="bus", relation="=", value=bus_id),
+                    Filter(field="tag", key="bus_optout", relation="!=", value="true"),
+                ],
                 channel=os.getenv("ONESIGNAL_BUS_CHANNEL"),
             )
 
