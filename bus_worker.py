@@ -30,7 +30,10 @@ CREATE TABLE IF NOT EXISTS bus (
 """
 )
 
-database = sqlite3.connect(DATABASE)
+required_env_vars = ["ONESIGNAL_API_KEY", "ONESIGNAL_APP_ID", "ONESIGNAL_BUS_CHANNEL"]
+for var in required_env_vars:
+    if not os.getenv(var):
+        raise EnvironmentError(f"Missing required environment variable: {var}")
 
 onesignal_configuration = onesignal.Configuration(
     app_key=os.environ.get("ONESIGNAL_API_KEY"),
@@ -62,7 +65,7 @@ def sendNotification(
         include_external_user_ids=userIds,
         ttl=ttl,
         headings={"en": title},
-        filters=[filter] if filter else None,
+        filters=[filter] if filter else [],
         android_channel_id=channel,
         android_accent_color="E63009",
         is_android=True,
@@ -74,9 +77,9 @@ def sendNotification(
 
 def parseSite():
     response = requests.get(BASE_URL)
-
     if response.status_code != 200:
-        raise Exception(f"Failed to load page: Status code {response.status_code}")
+        print(f"Failed to load page: Status code {response.status_code}")
+        return
 
     soup = BeautifulSoup(response.content, "html.parser")
 
@@ -129,11 +132,13 @@ def parseSite():
 
 def main():
     while True:
-        # Parse the site every 10 seconds between 15:00 and 17:00, then reset all buses to bay 0 at midnight because that's when runshaw does it
-        current_time = datetime.now()
-        if current_time.hour == 0 and current_time.minute == 0:
-            cursor.execute("UPDATE bus SET bus_bay = '0'")
-            conn.commit()
-        elif (current_time.hour in [15, 16]) or DEBUG:
-            parseSite()
+        try:
+            current_time = datetime.now()
+            if current_time.hour == 0 and current_time.minute == 0:
+                cursor.execute("UPDATE bus SET bus_bay = '0'")
+                conn.commit()
+            elif (current_time.hour in [15, 16]) or DEBUG:
+                parseSite()
             time.sleep(10)
+        except Exception as e:
+            print(f"Error in main loop: {e}")
