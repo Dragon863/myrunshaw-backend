@@ -34,6 +34,18 @@ def init_db():
     with sqlite3.connect(DATABASE) as conn:
         conn.execute(
             """
+            CREATE TABLE IF NOT EXISTS blocked_users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                blocker_id TEXT NOT NULL,
+                blocked_id TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(blocker_id, blocked_id)
+            )
+        """
+        )
+
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS friend_requests (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 sender_id TEXT NOT NULL,
@@ -163,6 +175,19 @@ def authenticate(f):
     return decorated_function
 
 
+def is_blocked(user_id1, user_id2):
+    with get_db() as db:
+        block = db.execute(
+            """
+            SELECT * FROM blocked_users 
+            WHERE (blocker_id = ? AND blocked_id = ?)
+               OR (blocker_id = ? AND blocked_id = ?)
+            """,
+            (user_id1, user_id2, user_id2, user_id1),
+        ).fetchone()
+    return block is not None
+
+
 """
 **Friend Request Routes**
 
@@ -180,6 +205,9 @@ def send_friend_request():
 
     if receiver_id == request.user_id.lower():
         return jsonify({"error": "Cannot send friend request to yourself"}), 400
+
+    if is_blocked(request.user_id.lower(), receiver_id.lower()):
+        return jsonify({"error": "Cannot send friend request to this user"}), 403
 
     try:
         adminClient = Client()
@@ -278,6 +306,65 @@ def get_friends():
         ).fetchall()
 
     return jsonify([dict(friend) for friend in friends])
+
+
+@app.route("/api/block", methods=["POST"])
+@authenticate
+@limiter.limit("5/minute")
+def block_user():
+    blocked_id = request.json.get("blocked_id")
+    if not blocked_id:
+        return jsonify({"error": "blocked_id is required"}), 400
+
+    if blocked_id == request.user_id:
+        return jsonify({"error": "Cannot block yourself"}), 400
+
+    try:
+        with get_db() as db:
+            db.execute(
+                "INSERT INTO blocked_users (blocker_id, blocked_id) VALUES (?, ?)",
+                (request.user_id.lower(), blocked_id.lower()),
+            )
+
+            db.execute(
+                """
+                DELETE FROM friend_requests
+                WHERE ((sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?))
+                  AND status = 'accepted'
+                """,
+                (
+                    request.user_id.lower(),
+                    blocked_id.lower(),
+                    blocked_id.lower(),
+                    request.user_id.lower(),
+                ),
+            )
+            db.commit()
+
+        return (
+            jsonify({"message": "User blocked and friendship removed (if applicable)"}),
+            201,
+        )
+    except sqlite3.IntegrityError:
+        return jsonify({"error": "User is already blocked"}), 409
+
+
+@app.route("/api/block", methods=["DELETE"])
+@authenticate
+@limiter.limit("5/minute")
+def unblock_user():
+    blocked_id = request.json.get("blocked_id")
+    if not blocked_id:
+        return jsonify({"error": "blocked_id is required"}), 400
+
+    with get_db() as db:
+        db.execute(
+            "DELETE FROM blocked_users WHERE blocker_id = ? AND blocked_id = ?",
+            (request.user_id.lower(), blocked_id.lower()),
+        )
+        db.commit()
+
+    return jsonify({"message": "User unblocked successfully"})
 
 
 """
