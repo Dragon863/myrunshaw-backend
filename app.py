@@ -399,7 +399,6 @@ def upload_timetable():
 
 @app.route("/api/timetable", methods=["GET"])
 @authenticate
-@limiter.limit("30/minute")  # Higher limit as this is called by the timetable page
 def get_timetable():
     user_id = request.args.get("user_id", request.user_id)
 
