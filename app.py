@@ -500,7 +500,7 @@ def close_account():
         http = urllib3.PoolManager()
 
         response = http.request(
-            "DELETE", url, headers={"Authorization": f"Bearer {os.environ.get("ONESIGNAL_API_KEY")}:"}
+            "DELETE", url, headers={"Authorization": f"Bearer: {os.environ.get("ONESIGNAL_API_KEY")}"}
         )
         if response.status != 200:
             app.logger.error(f"Failed to delete OneSignal user: {response.data}")
