@@ -473,6 +473,7 @@ def close_account():
         adminClient.set_key(os.getenv("APPWRITE_API_KEY"))
         users = Users(adminClient)
         users.delete(request.user_id)
+
         with get_db() as db:
             db.execute(
                 "DELETE FROM blocked_users WHERE blocker_id = ? OR blocked_id = ?",
@@ -489,6 +490,7 @@ def close_account():
 
         onesignal_configuration = onesignal.Configuration(
             app_key=os.environ.get("ONESIGNAL_API_KEY"),
+            api_key=os.environ.get("ONESIGNAL_API_KEY"),
         )
         onesignal_api = default_api.DefaultApi(
             onesignal.ApiClient(configuration=onesignal_configuration)
