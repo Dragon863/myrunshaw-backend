@@ -467,7 +467,11 @@ Compliance routes, e.g. closing accounts, resetting passwords, etc.
 @limiter.limit("1/minute")
 def close_account():
     try:
-        users = Users(client)
+        adminClient = Client()
+        adminClient.set_endpoint(os.getenv("APPWRITE_ENDPOINT"))
+        adminClient.set_project(os.getenv("APPWRITE_PROJECT_ID"))
+        adminClient.set_key(os.getenv("APPWRITE_API_KEY"))
+        users = Users(adminClient)
         users.delete(request.user_id)
         with get_db() as db:
             db.execute(
