@@ -10,10 +10,12 @@ from flask_limiter.util import get_remote_address
 from appwrite.client import Client
 from appwrite.services.account import Account
 from appwrite.services.users import Users
+import onesignal
+from onesignal.api import default_api
 from bus_worker import main as worker_main
 from bus_worker import sendNotification
 from threading import Thread
-from flask_cors import CORS
+from flask_cors import CORS  # type: ignore
 
 dotenv.load_dotenv()
 
@@ -308,6 +310,21 @@ def get_friends():
     return jsonify([dict(friend) for friend in friends])
 
 
+@app.route("/api/exists/<string:user_id>", methods=["GET"])
+@limiter.limit("25/minute")
+def user_exists(user_id):
+    try:
+        adminClient = Client()
+        adminClient.set_endpoint(os.getenv("APPWRITE_ENDPOINT"))
+        adminClient.set_project(os.getenv("APPWRITE_PROJECT_ID"))
+        adminClient.set_key(os.getenv("APPWRITE_API_KEY"))
+        users = Users(adminClient)
+        users.get(user_id)
+        return jsonify({"exists": True}), 200
+    except Exception as e:
+        return jsonify({"exists": False}), 404
+
+
 @app.route("/api/block", methods=["POST"])
 @authenticate
 @limiter.limit("5/minute")
@@ -438,6 +455,50 @@ def get_bus():
     with get_bus_db() as db:
         buses = db.execute("SELECT * FROM bus").fetchall()
     return jsonify([dict(bus) for bus in buses])
+
+
+"""
+Compliance routes, e.g. closing accounts, resetting passwords, etc.
+"""
+
+
+@app.route("/api/account/close", methods=["POST"])
+@authenticate
+@limiter.limit("1/minute")
+def close_account():
+    try:
+        users = Users(client)
+        users.delete(request.user_id)
+        with get_db() as db:
+            db.execute(
+                "DELETE FROM blocked_users WHERE blocker_id = ? OR blocked_id = ?",
+                (request.user_id, request.user_id),
+            )
+            db.execute(
+                "DELETE FROM friend_requests WHERE sender_id = ? OR receiver_id = ?",
+                (request.user_id, request.user_id),
+            )
+            db.commit()
+        with get_timetable_db() as db:
+            db.execute("DELETE FROM timetables WHERE user_id = ?", (request.user_id,))
+            db.commit()
+
+        onesignal_configuration = onesignal.Configuration(
+            app_key=os.environ.get("ONESIGNAL_API_KEY"),
+        )
+        onesignal_api = default_api.DefaultApi(
+            onesignal.ApiClient(configuration=onesignal_configuration)
+        )
+        onesignal_api.delete_user(
+            app_id=os.environ.get("ONESIGNAL_APP_ID"),
+            alias_label="external_id",
+            alias_id=request.user_id,
+        )
+
+        return jsonify({"message": "Account deleted successfully"}), 200
+    except Exception as e:
+        app.logger.error(f"Error closing account: {e}")
+        return jsonify({"error": "Failed to close account"}), 500
 
 
 if __name__ == "__main__":
