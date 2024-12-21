@@ -504,7 +504,6 @@ def close_account():
         )
         if response.status != 200:
             app.logger.error(f"Failed to delete OneSignal user: {response.data}")
-            return jsonify({"error": "Failed to close account"}), 500
 
         return jsonify({"message": "Account deleted successfully"}), 200
     except Exception as e:
