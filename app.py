@@ -12,6 +12,7 @@ from appwrite.services.account import Account
 from appwrite.services.users import Users
 import onesignal
 from onesignal.api import default_api
+import urllib3
 from bus_worker import main as worker_main
 from bus_worker import sendNotification
 from threading import Thread
@@ -488,18 +489,22 @@ def close_account():
             db.execute("DELETE FROM timetables WHERE user_id = ?", (request.user_id,))
             db.commit()
 
-        onesignal_configuration = onesignal.Configuration(
-            app_key=os.environ.get("ONESIGNAL_API_KEY"),
-            api_key=os.environ.get("ONESIGNAL_API_KEY"),
+        app_id = "001b2238-9af7-49f1-bd60-6dfe630b7175"
+        alias_label = "external_id"
+        alias_id = request.user_id
+
+        url = (
+            f"https://api.onesignal.com/apps/{app_id}/users/by/{alias_label}/{alias_id}"
         )
-        onesignal_api = default_api.DefaultApi(
-            onesignal.ApiClient(configuration=onesignal_configuration)
+
+        http = urllib3.PoolManager()
+
+        response = http.request(
+            "DELETE", url, headers={"Authorization": f"Bearer {os.environ.get("ONESIGNAL_API_KEY")}:"}
         )
-        onesignal_api.delete_user(
-            app_id=os.environ.get("ONESIGNAL_APP_ID"),
-            alias_label="external_id",
-            alias_id=request.user_id,
-        )
+        if response.status != 200:
+            app.logger.error(f"Failed to delete OneSignal user: {response.data}")
+            return jsonify({"error": "Failed to close account"}), 500
 
         return jsonify({"message": "Account deleted successfully"}), 200
     except Exception as e:
