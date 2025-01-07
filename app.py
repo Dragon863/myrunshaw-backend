@@ -10,8 +10,6 @@ from flask_limiter.util import get_remote_address
 from appwrite.client import Client
 from appwrite.services.account import Account
 from appwrite.services.users import Users
-import onesignal
-from onesignal.api import default_api
 import urllib3
 from bus_worker import main as worker_main
 from bus_worker import sendNotification
@@ -458,6 +456,37 @@ def get_bus():
     return jsonify([dict(bus) for bus in buses])
 
 
+@app.route("/api/bus/for", methods=["GET"])
+@authenticate
+@limiter.limit("20/minute")
+def get_bus_for():
+    for_user_id = request.args.get("user_id", request.user_id)
+
+    with get_db() as db:
+        friendship = db.execute(
+            """SELECT * FROM friend_requests 
+                WHERE status = 'accepted' 
+                AND ((sender_id = ? AND receiver_id = ?) 
+                    OR (sender_id = ? AND receiver_id = ?))""",
+            (
+                request.user_id.lower(),
+                for_user_id.lower(),
+                for_user_id.lower(),
+                request.user_id.lower(),
+            ),
+        ).fetchone()
+        if not friendship:
+            return jsonify({"error": "Unauthorized access"}), 403
+    adminClient = Client()
+    adminClient.set_endpoint(os.getenv("APPWRITE_ENDPOINT"))
+    adminClient.set_project(os.getenv("APPWRITE_PROJECT_ID"))
+    adminClient.set_key(os.getenv("APPWRITE_API_KEY"))
+    users = Users(adminClient)
+    user: dict = users.get(for_user_id)
+    preferences = user.get("prefs", {"bus_number": "Not Set"})
+    return jsonify(preferences["bus_number"])
+
+
 """
 Compliance routes, e.g. closing accounts, resetting passwords, etc.
 """
@@ -500,7 +529,9 @@ def close_account():
         http = urllib3.PoolManager()
 
         response = http.request(
-            "DELETE", url, headers={"Authorization": f"Bearer: {os.environ.get('ONESIGNAL_API_KEY')}"}
+            "DELETE",
+            url,
+            headers={"Authorization": f"Bearer: {os.environ.get('ONESIGNAL_API_KEY')}"},
         )
         if response.status != 200:
             app.logger.error(f"Failed to delete OneSignal user: {response.data}")
