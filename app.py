@@ -232,6 +232,7 @@ def send_friend_request():
                 userIds=[receiver_id.lower()],
                 title="Friend Request",
                 ttl=60 * 60 * 24 * 2,
+                small_icon="friend",
             )
         return jsonify({"message": "Friend request sent"}), 201
     except sqlite3.IntegrityError as e:

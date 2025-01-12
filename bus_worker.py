@@ -52,6 +52,7 @@ def sendNotification(
     filters: list = [],
     channel: str = os.getenv("ONESIGNAL_GENERIC_CHANNEL"),
     priority: int = 10,
+    small_icon="ic_stat_onesignal_default",
 ):
     """
     message: str = The message to send to the user
@@ -70,6 +71,8 @@ def sendNotification(
         android_accent_color="E63009",
         is_android=True,
         is_ios=True,
+        priority=priority,
+        small_icon=small_icon,
     )
 
     response = onesignal_api.create_notification(notification)
