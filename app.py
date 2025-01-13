@@ -20,7 +20,23 @@ dotenv.load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
-limiter = Limiter(get_remote_address, app=app)
+
+
+def custom_key_func():
+    # Extract the first IP from X-Forwarded-For, or fallback to request.remote_addr
+    real_ip = (
+        request.headers.get("X-Forwarded-For", request.remote_addr)
+        .split(",")[0]
+        .strip()
+    )
+    return real_ip
+
+
+limiter = Limiter(
+    key_func=custom_key_func,
+    app=app,
+    strategy="fixed-window",
+)
 
 DATABASE = "data/friends.db"
 TIMETABLE_DATABASE = "data/timetables.db"
