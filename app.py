@@ -220,7 +220,7 @@ def send_friend_request():
     if not receiver_id:
         return jsonify({"error": "receiver_id is required"}), 400
 
-    if receiver_id == request.user_id.lower():
+    if receiver_id.lower() == request.user_id.lower():
         return jsonify({"error": "Cannot send friend request to yourself"}), 400
 
     if is_blocked(request.user_id.lower(), receiver_id.lower()):
@@ -345,6 +345,15 @@ def user_exists(user_id):
 @authenticate
 @limiter.limit("5/minute")
 def block_user():
+    return (
+        jsonify(
+            {
+                "error": "Blocking is temporarily disabled while we work on a technical glitch. Thank you for your patience!"
+            }
+        ),
+        400,
+    )  # TODO: this
+
     blocked_id = request.json.get("blocked_id")
     if not blocked_id:
         return jsonify({"error": "blocked_id is required"}), 400
