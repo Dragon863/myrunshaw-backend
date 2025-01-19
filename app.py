@@ -38,17 +38,19 @@ limiter = Limiter(
     strategy="fixed-window",
 )
 
-DATABASE = "data/friends.db"
+FRIENDS_DATABASE = "data/friends.db"
 TIMETABLE_DATABASE = "data/timetables.db"
 BUS_DATABASE = "data/bus.db"
 
-client = Client()
-client.set_endpoint(os.getenv("APPWRITE_ENDPOINT"))
-client.set_project(os.getenv("APPWRITE_PROJECT_ID"))
+adminClient = Client()
+adminClient.set_endpoint(os.getenv("APPWRITE_ENDPOINT"))
+adminClient.set_project(os.getenv("APPWRITE_PROJECT_ID"))
+adminClient.set_key(os.getenv("APPWRITE_API_KEY"))
+users = Users(adminClient)
 
 
 def init_db():
-    with sqlite3.connect(DATABASE) as conn:
+    with sqlite3.connect(FRIENDS_DATABASE) as conn:
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS blocked_users (
@@ -71,6 +73,18 @@ def init_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(sender_id, receiver_id)
+            )
+        """
+        )
+
+        # Used to store the user ID and the integer version of their profile picture
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS profile_pics (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                version INTEGER NOT NULL,
+                UNIQUE(user_id)
             )
         """
         )
@@ -107,6 +121,9 @@ def init_db():
 def verify_token(token):
     """Verify Appwrite JWT token and extract user ID from itt"""
     try:
+        client = Client()
+        client.set_endpoint(os.getenv("APPWRITE_ENDPOINT"))
+        client.set_project(os.getenv("APPWRITE_PROJECT_ID"))
         client.set_jwt(token)
         account = Account(client)
         user = account.get()
@@ -119,7 +136,7 @@ def verify_token(token):
 def get_db():
     """Reuse database connection during request lifetime."""
     if "db" not in g:
-        g.db = sqlite3.connect(DATABASE)
+        g.db = sqlite3.connect(FRIENDS_DATABASE)
         g.db.row_factory = sqlite3.Row
     return g.db
 
@@ -223,14 +240,11 @@ def send_friend_request():
     if receiver_id.lower() == request.user_id.lower():
         return jsonify({"error": "Cannot send friend request to yourself"}), 400
 
-    if is_blocked(request.user_id.lower(), receiver_id.lower()):
-        return jsonify({"error": "Cannot send friend request to this user"}), 403
+    # if is_blocked(request.user_id.lower(), receiver_id.lower()):
+    #     return jsonify({"error": "Cannot send friend request to this user"}), 403
+    # This is disabled for now as we've removed the ability to block users
 
     try:
-        adminClient = Client()
-        adminClient.set_endpoint(os.getenv("APPWRITE_ENDPOINT"))
-        adminClient.set_project(os.getenv("APPWRITE_PROJECT_ID"))
-        adminClient.set_key(os.getenv("APPWRITE_API_KEY"))
         users = Users(adminClient)
         users.get(receiver_id)
     except Exception as e:
@@ -238,6 +252,30 @@ def send_friend_request():
 
     try:
         with get_db() as db:
+            cursor = db.cursor()
+
+            # Check if a request exists in either direction
+            cursor.execute(
+                """
+                SELECT 1 FROM friend_requests 
+                WHERE (sender_id = ? AND receiver_id = ?)
+                   OR (sender_id = ? AND receiver_id = ?)
+                """,
+                (
+                    request.user_id.lower(),
+                    receiver_id.lower(),
+                    receiver_id.lower(),
+                    request.user_id.lower(),
+                ),
+            )
+            if cursor.fetchone():
+                return (
+                    jsonify(
+                        {"error": "Friend request already exists in one direction"}
+                    ),
+                    400,
+                )
+
             db.execute(
                 "INSERT INTO friend_requests (sender_id, receiver_id) VALUES (?, ?)",
                 (request.user_id.lower(), receiver_id.lower()),
@@ -248,12 +286,14 @@ def send_friend_request():
                 userIds=[receiver_id.lower()],
                 title="Friend Request",
                 ttl=60 * 60 * 24 * 2,
-                small_icon="friend",
+                small_icon="friend",  # Fun story: this used to default to a bus icon, which seemed vaguely threatening for android users!
             )
         return jsonify({"message": "Friend request sent"}), 201
-    except sqlite3.IntegrityError as e:
-        app.logger.error(f"Database integrity error: {e}")
-        return jsonify({"error": "Friend request already exists"}), 409
+    except Exception as e:
+        return (
+            jsonify({"error": "An error occurred while sending the friend request"}),
+            500,
+        )
 
 
 @app.route("/api/friend-requests", methods=["GET"])
@@ -299,6 +339,7 @@ def handle_friend_request(request_id):
             userIds=[req["sender_id"]],
             title="Friend Request",
             ttl=60 * 60 * 24 * 2,
+            small_icon="friend",
         )
 
         db.execute(
@@ -314,7 +355,7 @@ def handle_friend_request(request_id):
 
 @app.route("/api/friends", methods=["GET"])
 @authenticate
-@limiter.limit("25/minute")
+@limiter.limit("40/minute")
 def get_friends():
     with get_db() as db:
         friends = db.execute(
@@ -326,14 +367,21 @@ def get_friends():
     return jsonify([dict(friend) for friend in friends])
 
 
+@app.route("/api/name/get/<string:user_id>", methods=["GET"])
+def get_name(user_id):
+    # Introduced in version 1.2.4
+    try:
+        users = Users(adminClient)
+        user: dict = users.get(user_id)
+        return jsonify({"name": user["name"]}), 200
+    except Exception as e:
+        return jsonify({"error": "User not found"}), 404
+
+
 @app.route("/api/exists/<string:user_id>", methods=["GET"])
 @limiter.limit("25/minute")
 def user_exists(user_id):
     try:
-        adminClient = Client()
-        adminClient.set_endpoint(os.getenv("APPWRITE_ENDPOINT"))
-        adminClient.set_project(os.getenv("APPWRITE_PROJECT_ID"))
-        adminClient.set_key(os.getenv("APPWRITE_API_KEY"))
         users = Users(adminClient)
         users.get(user_id)
         return jsonify({"exists": True}), 200
@@ -345,15 +393,7 @@ def user_exists(user_id):
 @authenticate
 @limiter.limit("5/minute")
 def block_user():
-    return (
-        jsonify(
-            {
-                "error": "Blocking is temporarily disabled while we work on a technical glitch. Thank you for your patience!"
-            }
-        ),
-        400,
-    )  # TODO: this
-
+    # Route name preserved for backwards compatibility. This route actually just deletes the friendship if it exists - more of an "unfriend" route
     blocked_id = request.json.get("blocked_id")
     if not blocked_id:
         return jsonify({"error": "blocked_id is required"}), 400
@@ -361,19 +401,14 @@ def block_user():
     if blocked_id == request.user_id:
         return jsonify({"error": "Cannot block yourself"}), 400
 
+    blocked_id = blocked_id.lower()
+
     try:
         with get_db() as db:
             db.execute(
-                "INSERT INTO blocked_users (blocker_id, blocked_id) VALUES (?, ?)",
-                (request.user_id.lower(), blocked_id.lower()),
-            )
-
-            db.execute(
-                """
-                DELETE FROM friend_requests
-                WHERE ((sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?))
-                  AND status = 'accepted'
-                """,
+                """DELETE FROM friend_requests 
+                   WHERE (sender_id = ? AND receiver_id = ?) 
+                      OR (sender_id = ? AND receiver_id = ?)""",
                 (
                     request.user_id.lower(),
                     blocked_id.lower(),
@@ -381,14 +416,19 @@ def block_user():
                     request.user_id.lower(),
                 ),
             )
+            db.execute(
+                "INSERT INTO blocked_users (blocker_id, blocked_id) VALUES (?, ?)",
+                (request.user_id.lower(), blocked_id.lower()),
+            )
             db.commit()
 
         return (
             jsonify({"message": "User blocked and friendship removed (if applicable)"}),
             201,
         )
+
     except sqlite3.IntegrityError:
-        return jsonify({"error": "User is already blocked"}), 409
+        return jsonify({"error": "You are not friends with this user"}), 409
 
 
 @app.route("/api/block", methods=["DELETE"])
@@ -473,6 +513,63 @@ def get_timetable():
     return jsonify({"timetable": json.loads(timetable["timetable"])})
 
 
+@app.route("/api/timetable/batch_get", methods=["POST"])
+@authenticate
+def get_timetable_batch():
+    # User ids are in the json body under the key "user_ids"
+    user_ids = request.json.get("user_ids")
+
+    if not user_ids:
+        return jsonify({"error": "user_ids is required"}), 400
+
+    for user_id in user_ids:
+        if user_id != request.user_id:
+            with get_db() as db:
+                friendship = db.execute(
+                    """SELECT * FROM friend_requests 
+                       WHERE status = 'accepted' 
+                       AND ((sender_id = ? AND receiver_id = ?) 
+                            OR (sender_id = ? AND receiver_id = ?))""",
+                    (
+                        request.user_id.lower(),
+                        user_id.lower(),
+                        user_id.lower(),
+                        request.user_id.lower(),
+                    ),
+                ).fetchone()
+                if not friendship:
+                    return jsonify({"error": "Unauthorized access"}), 403
+
+    with get_timetable_db() as db:
+        timetables = db.execute(
+            "SELECT user_id, timetable FROM timetables WHERE user_id IN ({})".format(
+                ",".join("?" * len(user_ids))
+            ),
+            user_ids,
+        ).fetchall()
+
+    for user_id in user_ids:
+        if not any(timetable["user_id"] == user_id for timetable in timetables):
+            timetables.append(
+                {
+                    "user_id": user_id,
+                    "timetable": json.dumps(
+                        {
+                            "data": [],
+                        }
+                    ),
+                }
+            )
+            # Add an empty timetable for users who don't have one in the DB
+
+    return jsonify(
+        {
+            timetable["user_id"]: json.loads(timetable["timetable"])
+            for timetable in timetables
+        }
+    )
+
+
 @app.route("/api/bus", methods=["GET"])
 @authenticate
 @limiter.limit("20/minute")
@@ -503,14 +600,11 @@ def get_bus_for():
         ).fetchone()
         if not friendship:
             return jsonify({"error": "Unauthorized access"}), 403
-    adminClient = Client()
-    adminClient.set_endpoint(os.getenv("APPWRITE_ENDPOINT"))
-    adminClient.set_project(os.getenv("APPWRITE_PROJECT_ID"))
-    adminClient.set_key(os.getenv("APPWRITE_API_KEY"))
+
     users = Users(adminClient)
     user: dict = users.get(for_user_id)
-    preferences = user.get("prefs", {"bus_number": "Not Set"})
-    return jsonify(preferences["bus_number"])
+    preferences: dict = user.get("prefs", {"bus_number": "Not Set"})
+    return jsonify(preferences.get("bus_number", "Not Set"))
 
 
 """
@@ -523,10 +617,6 @@ Compliance routes, e.g. closing accounts, resetting passwords, etc.
 @limiter.limit("1/minute")
 def close_account():
     try:
-        adminClient = Client()
-        adminClient.set_endpoint(os.getenv("APPWRITE_ENDPOINT"))
-        adminClient.set_project(os.getenv("APPWRITE_PROJECT_ID"))
-        adminClient.set_key(os.getenv("APPWRITE_API_KEY"))
         users = Users(adminClient)
         users.delete(request.user_id)
 
@@ -566,6 +656,136 @@ def close_account():
     except Exception as e:
         app.logger.error(f"Error closing account: {e}")
         return jsonify({"error": "Failed to close account"}), 500
+
+
+"""
+Cache routes - this manages telling clients when to download a new profile picture
+"""
+
+
+@app.route("/api/cache/get/pfp-versions", methods=["POST"])
+@authenticate
+def updatePfpVersions():
+    # This route will be called upon opening the app. It will return the current version of the profile pictures
+    # for the users provided in the JSON body under the key "user_ids"
+    user_ids = request.json.get("user_ids")
+    if not user_ids:
+        return jsonify({"error": "user_ids is required"}), 400
+
+    with get_db() as db:
+        versions = db.execute(
+            "SELECT user_id, version FROM profile_pics WHERE user_id IN ({})".format(
+                ",".join("?" * len(user_ids))
+            ),
+            user_ids,
+        ).fetchall()
+
+    for user_id in user_ids:
+        if not any(version["user_id"] == user_id for version in versions):
+            versions.append(
+                {
+                    "user_id": user_id,
+                    "version": 0,
+                }
+            )
+            # Add an empty version for users who don't have one in the DB
+
+    return jsonify({version["user_id"]: version["version"] for version in versions})
+
+
+@app.route("/api/cache/update/pfp-version", methods=["POST"])
+@authenticate
+def updatePfpVersion():
+    # This route will be called when a user updates their profile picture. It will update the version in the database
+    user_id = request.user_id
+
+    with get_db() as db:
+        current_version = db.execute(
+            "SELECT version FROM profile_pics WHERE user_id = ?", (user_id,)
+        ).fetchone()
+        if not current_version:
+            db.execute(
+                "INSERT INTO profile_pics (user_id, version) VALUES (?, ?)",
+                (user_id, 1),
+            )
+            db.commit()
+            return (
+                jsonify({"message": "Profile picture version updated successfully"}),
+                200,
+            )
+        else:
+            new_version = int(current_version["version"]) + 1
+
+        db.execute(
+            """INSERT INTO profile_pics (user_id, version) 
+               VALUES (?, ?) 
+               ON CONFLICT(user_id) 
+               DO UPDATE SET version = excluded.version""",
+            (user_id, new_version),
+        )
+        db.commit()
+
+    return jsonify({"message": "Profile picture version updated successfully"}), 200
+
+
+"""
+These routes are additional bus routes - they account for some edge cases where a user requires notifications for more than one college bus
+"""
+
+
+@app.route("/api/extra_buses/add", methods=["POST"])
+@authenticate
+@limiter.limit("5/minute")
+def add_bus():
+    bus_number = str(request.json.get("bus_number"))
+    if not bus_number:
+        return jsonify({"error": "bus_number is required"}), 400
+
+    with get_bus_db() as db:
+        try:
+            db.execute(
+                "INSERT INTO extra_bus_subscriptions (user_id, bus) VALUES (?, ?)",
+                (request.user_id, bus_number),
+            )
+            db.commit()
+        except sqlite3.IntegrityError:
+            return jsonify({"message": "Bus already added"}), 409
+
+    return jsonify({"message": "Bus added successfully"}), 201
+
+
+@app.route("/api/extra_buses/remove", methods=["POST"])
+@authenticate
+@limiter.limit("5/minute")
+def remove_bus():
+    bus_number = str(request.json.get("bus_number"))
+    if not bus_number:
+        return jsonify({"error": "bus_number is required"}), 400
+
+    with get_bus_db() as db:
+        try:
+            db.execute(
+                "DELETE FROM extra_bus_subscriptions WHERE user_id = ? AND bus = ?",
+                (request.user_id, bus_number),
+            )
+            db.commit()
+        except sqlite3.IntegrityError:
+            return (jsonify({"message": "Bus not found"}),), 404
+
+    return jsonify({"message": "Bus removed successfully"}), 201
+
+
+@app.route("/api/extra_buses/get", methods=["GET"])
+@authenticate
+@limiter.limit("20/minute")
+def get_extra_buses():
+    with get_bus_db() as db:
+        buses = db.execute(
+            "SELECT * FROM extra_bus_subscriptions WHERE user_id = ?",
+            (request.user_id,),
+        ).fetchall()
+
+    return jsonify([dict(bus) for bus in buses])
 
 
 if __name__ == "__main__":

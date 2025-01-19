@@ -30,6 +30,16 @@ CREATE TABLE IF NOT EXISTS bus (
 """
 )
 
+conn.execute(
+    """
+CREATE TABLE IF NOT EXISTS extra_bus_subscriptions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,
+    bus TEXT NOT NULL DEFAULT ''
+)
+"""
+)
+
 required_env_vars = ["ONESIGNAL_API_KEY", "ONESIGNAL_APP_ID", "ONESIGNAL_BUS_CHANNEL"]
 for var in required_env_vars:
     if not os.getenv(var):
@@ -76,7 +86,7 @@ def sendNotification(
     )
 
     response = onesignal_api.create_notification(notification)
-    print(response)
+    # print(response)
 
 
 def parseSite():
@@ -135,6 +145,23 @@ def parseSite():
                 ],
                 channel=os.getenv("ONESIGNAL_BUS_CHANNEL"),
             )
+
+            # Now check the extra bus subscriptions
+            cursor.execute(
+                "SELECT user_id FROM extra_bus_subscriptions WHERE bus = ?", (bus_id,)
+            )
+
+            ids = []
+            for row in cursor.fetchall():
+                ids.append(row[0])
+
+            if len(ids) > 0:
+                sendNotification(
+                    f"The {bus_id} bus has arrived in bay {new_bay}",
+                    userIds=ids,
+                    title="Bus Update!",
+                    channel=os.getenv("ONESIGNAL_BUS_CHANNEL"),
+                )
 
 
 def main():
