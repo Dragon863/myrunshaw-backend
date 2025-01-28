@@ -51,7 +51,7 @@ async def shutdown_event():
 
 app = FastAPI(
     title="My Runshaw API",
-    description="The API used by the backend of the My Runshaw app to manage friendships, timetables, push notifications, buses and more.",
+    description="The API used by the backend of the My Runshaw app to manage friendships, timetables, push notifications, buses and more. To authenticate with this API, you must provide an Appwrite JWT in the Authorization header.",
     version=getFromEnv("API_VERSION"),
     on_startup=[startup_event],
     on_shutdown=[shutdown_event],
@@ -86,15 +86,16 @@ async def authenticate(req: Request):
             token = authorization.split(" ")[1]
         else:
             token = authorization
-        client = Client()
-        client.set_endpoint(getFromEnv("APPWRITE_ENDPOINT"))
-        client.set_project(getFromEnv("APPWRITE_PROJECT_ID"))
-        client.set_jwt(token)
-        account = Account(client)
+        authClient = Client()
+        authClient.set_endpoint(getFromEnv("APPWRITE_ENDPOINT"))
+        authClient.set_project(getFromEnv("APPWRITE_PROJECT_ID"))
+        authClient.set_jwt(token)
+        account = Account(authClient)
         user = account.get()
         req.user_id = user["$id"]
         return user
     except Exception as e:
+        raise e
         raise HTTPException(status_code=401, detail="Unauthorized; invalid token.")
 
 
@@ -135,9 +136,45 @@ async def get_name(req: Request, user_id: str, auth_user: dict = Depends(authent
         return JSONResponse({"error": "User not found"}, status_code=404)
 
 
+@app.post(
+    "/api/name/get/batch",
+    dependencies=[Depends(authenticate), Depends(security)],
+    tags=["Friends"],
+)
+async def get_names(
+    req: Request, body: BatchGetBody, auth_user: dict = Depends(authenticate)
+):
+    """Fetch the names of multiple users by their IDs."""
+    try:
+        adminUsers = Users(adminClient)
+        names = {}
+        async with aiohttp.ClientSession() as session:
+            for user_id in body.user_ids:
+                try:
+                    api_res = await session.get(
+                        f"{getFromEnv('APPWRITE_ENDPOINT')}/users/{user_id}",
+                        headers={
+                            "x-appwrite-project": getFromEnv("APPWRITE_PROJECT_ID"),
+                            "x-appwrite-key": getFromEnv("APPWRITE_API_KEY"),
+                            "user-agent": "ApppwritePythonSDK/7.0.0",
+                            "x-sdk-name": "Python",
+                            "x-sdk-platform": "server",
+                            "x-sdk-language": "python",
+                            "x-sdk-version": "7.0.0",
+                            "content-type": "application/json",
+                        },
+                    )
+                    user = await api_res.json()
+                    names[user_id] = user["name"]
+                except Exception as e:
+                    names[user_id] = "Unknown User"
+            return JSONResponse(names)
+    except Exception as e:
+        return JSONResponse({"error": "Failed to fetch names"}, status_code=500)
+
+
 @app.get(
     "/api/exists/{user_id}",
-    dependencies=[Depends(authenticate), Depends(security)],
     tags=["Auth"],
 )
 def user_exists(user_id):
@@ -156,7 +193,7 @@ def user_exists(user_id):
 )
 async def block_user(
     req: Request,
-    blocked_id: BlockedID,
+    blocked_id_body: BlockedID,
 ):
     """Block a user by their ID."""
 
@@ -166,20 +203,20 @@ async def block_user(
                 """DELETE FROM friend_requests 
                 WHERE (sender_id = $1 AND receiver_id = $2) 
                     OR (sender_id = $2 AND receiver_id = $1)""",
-                (
-                    req.user_id.lower(),
-                    blocked_id.lower(),
-                ),
+                req.user_id.lower(),
+                blocked_id_body.blocked_id.lower(),
             )
             await conn.execute(
                 "INSERT INTO blocked_users (blocker_id, blocked_id) VALUES ($1, $2)",
-                (req.user_id.lower(), blocked_id.lower()),
+                req.user_id.lower(),
+                blocked_id_body.blocked_id.lower(),
             )
             return JSONResponse(
                 {"message": "User blocked and friendship removed (if applicable)"},
                 201,
             )
     except Exception as e:
+        raise e
         return JSONResponse({"error": "You are not friends with this user"}, 409)
 
 
@@ -200,7 +237,7 @@ async def unblock_user(
                 "DELETE FROM blocked_users WHERE blocker_id = $1 AND blocked_id = $2",
                 (req.user_id.lower(), blocked_id.lower()),
             )
-            return JSONResponse({"message": "User unblocked successfully"}, 200)
+            return JSONResponse({"message": "User unblocked successfully"}, 201)
     except Exception as e:
         return JSONResponse({"error": "User is not blocked"}, 409)
 
@@ -235,16 +272,14 @@ async def add_timetable(
 )
 async def get_timetable(
     req: Request,
-    user_id_for: Optional[str] = None,
+    user_id: Optional[str] = None,
 ):
     """
     Fetch the timetable for a user. If `user_id` is not provided, fetch the timetable
     for the requester. Only allow access if the requester is the user or their friend.
     """
 
-    user_id = (
-        user_id_for or req.user_id
-    )  # If user_id_for is None, use the requester's ID
+    user_id = user_id or req.user_id  # If user_id_for is None, use the requester's ID
 
     if user_id != req.user_id:
         async with db_pool.acquire() as conn:
@@ -348,7 +383,7 @@ async def get_bus_for(req: Request, user_id: str):
     users = Users(adminClient)
     user = users.get(user_id)
     preferences: dict = user.get("prefs", {"bus_number": "Not Set"})
-    return JSONResponse({"bus_number": preferences.get("bus_number", "Not Set")})
+    return JSONResponse(preferences.get("bus_number", "Not Set"))
 
 
 @app.post(
@@ -392,7 +427,7 @@ async def remove_extra_buses(req: Request, buses: ExtraBusRequestBody):
                 req.user_id,
                 bus_number,
             )
-            return JSONResponse({"message": "Bus removed successfully"}, 200)
+            return JSONResponse({"message": "Bus removed successfully"}, 201)
         except Exception as e:
             return JSONResponse({"error": "Bus not found"}, 404)
 
