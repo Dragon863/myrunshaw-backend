@@ -1,0 +1,5 @@
+asyncpg
+beautifulsoup4
+onesignal-python-api
+requests
+python-dotenv

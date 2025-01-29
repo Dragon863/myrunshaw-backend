@@ -1,13 +1,20 @@
 version: '3.8'
 
 services:
-  app:
-    build: .
-    ports:
-      - "5005:5005"
-    volumes:
-      - ./data:/app/data
+  bus-worker:
+    build: 
+      context: src/bus-worker
     env_file:
-      - .env
+      - src/bus-worker/.env
     restart: unless-stopped
-    container_name: runshaw-friends-api
+    container_name: myrunshaw-bus-worker
+    network_mode: host
+
+  api:
+    build: 
+      context: src/api
+    env_file:
+      - src/api/.env
+    restart: unless-stopped
+    container_name: myrunshaw-api
+    network_mode: host

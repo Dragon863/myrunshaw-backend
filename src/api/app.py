@@ -6,7 +6,7 @@ import dotenv
 from appwrite.client import Client
 from appwrite.services.account import Account
 from appwrite.services.users import Users
-from fastapi import FastAPI, Depends, Query, Request, HTTPException
+from fastapi import FastAPI, Depends, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from utils.env import getFromEnv
@@ -95,7 +95,6 @@ async def authenticate(req: Request):
         req.user_id = user["$id"]
         return user
     except Exception as e:
-        raise e
         raise HTTPException(status_code=401, detail="Unauthorized; invalid token.")
 
 
@@ -259,6 +258,8 @@ async def add_timetable(
                 VALUES ($1, $2)
                 ON CONFLICT (user_id)
                 DO UPDATE SET timetable = $2, updated_at = CURRENT_TIMESTAMP""",
+                req.user_id.lower(),
+                json.dumps(timetable.dict()["timetable"]),
             )
             return JSONResponse({"message": "Timetable uploaded successfully"}, 201)
     except Exception as e:
@@ -332,21 +333,31 @@ async def batch_get_timetable(req: Request, request_body: BatchGetBody):
                 return JSONResponse({"error": "Unauthorised access"}, 403)
 
         timetables = await conn.fetch(
-            "SELECT user_id, timetable FROM timetables WHERE user_id = ANY($1::text[])",
+            """
+            SELECT user_id, timetable
+            FROM timetables
+            WHERE user_id = ANY($1::text[])
+            """,
             user_ids,
         )
 
+    # Ensure all requested users have a timetable entry
     for user_id in user_ids:
-        if not any([row["user_id"] == user_id for row in timetables]):
+        if not any(row["user_id"] == user_id for row in timetables):
             timetables.append(
                 {
                     "user_id": user_id,
-                    "timetable": {"data": []},
+                    "timetable": '{"data": []}',  # Ensuring valid JSON
                 }
             )
 
     return JSONResponse(
-        {timetable["user_id"]: timetable["timetable"] for timetable in timetables}
+        {
+            timetable["user_id"]: {
+                "data": json.loads(timetable["timetable"] or '{"data": []}')["data"],
+            }
+            for timetable in timetables
+        }
     )
 
 

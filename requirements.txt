@@ -2,7 +2,6 @@ Flask
 Flask-Limiter
 python-dotenv
 appwrite
-gunicorn
 beautifulsoup4
 onesignal-python-api
 flask-cors
