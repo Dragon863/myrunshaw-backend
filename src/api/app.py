@@ -116,7 +116,6 @@ async def get_friends(req: Request, auth_user: dict = Depends(authenticate)):
             )
             return [dict(row) for row in rows]
     except Exception as e:
-        raise e
         raise HTTPException(status_code=500, detail="Failed to fetch friends")
 
 
@@ -215,7 +214,6 @@ async def block_user(
                 201,
             )
     except Exception as e:
-        raise e
         return JSONResponse({"error": "You are not friends with this user"}, 409)
 
 
@@ -533,16 +531,16 @@ async def get_pfp_versions(req: Request, body: BatchGetBody):
     dependencies=[Depends(authenticate), Depends(security)],
     tags=["Profile Pictures"],
 )
-async def update_pfp_version(req: Request, user_id: str, version: int):
+async def update_pfp_version(req: Request):
     """Update the version of a user's profile picture."""
     async with db_pool.acquire() as conn:
         current_version = await conn.fetchval(
-            "SELECT version FROM profile_pics WHERE user_id = $1", user_id
+            "SELECT version FROM profile_pics WHERE user_id = $1", req.user_id
         )
         if not current_version:
             await conn.execute(
                 "INSERT INTO profile_pics (user_id, version) VALUES ($1, $2)",
-                user_id,
+                req.user_id,
                 1,
             )
         else:
@@ -551,7 +549,7 @@ async def update_pfp_version(req: Request, user_id: str, version: int):
             await conn.execute(
                 "UPDATE profile_pics SET version = $1 WHERE user_id = $2",
                 new_version,
-                user_id,
+                req.user_id,
             )
 
         return JSONResponse(
