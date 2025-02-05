@@ -8,3 +8,4 @@ beautifulsoup4
 onesignal-python-api
 aiohttp
 requests
+apitally[fastapi]

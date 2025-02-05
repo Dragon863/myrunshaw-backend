@@ -14,6 +14,7 @@ from utils.db.init import init_db
 from utils.models import *
 from utils.notifications import sendNotification
 from fastapi.security.http import HTTPBearer
+from apitally.fastapi import ApitallyMiddleware
 
 dotenv.load_dotenv()
 
@@ -68,6 +69,12 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+app.add_middleware(
+    ApitallyMiddleware,
+    client_id=getFromEnv("APITALLY_CLIENT_ID"),
+    env="prod",
 )
 
 security = HTTPBearer()
