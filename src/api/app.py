@@ -144,7 +144,6 @@ async def get_names(
 ):
     """Fetch the names of multiple users by their IDs."""
     try:
-        adminUsers = Users(adminClient)
         names = {}
         async with aiohttp.ClientSession() as session:
             for user_id in body.user_ids:
@@ -166,7 +165,11 @@ async def get_names(
                     names[user_id] = user["name"]
                 except Exception as e:
                     names[user_id] = "Unknown User"
-            return JSONResponse(names)
+            return JSONResponse(
+                names,
+                media_type="application/json",
+                headers={"Content-Type": "application/json; charset=utf-8"},
+            )
     except Exception as e:
         return JSONResponse({"error": "Failed to fetch names"}, status_code=500)
 
