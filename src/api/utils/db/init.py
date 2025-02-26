@@ -1,6 +1,3 @@
-import logging
-
-
 async def init_db(db_pool):
     async with db_pool.acquire() as conn:
         await conn.execute(
@@ -79,6 +76,21 @@ async def init_db(db_pool):
             """
         )
 
+        # New in v1.3.0 - timetable association table to link a user id (string) to a timetable url (string)
+        await conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS timetable_associations (
+                id SERIAL PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                url TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(user_id)
+            )
+            """
+        )
+
+        # Bus subscriptions
         await conn.execute(
             """
             CREATE TABLE IF NOT EXISTS bus (
@@ -97,5 +109,3 @@ async def init_db(db_pool):
             )
             """
         )
-
-        

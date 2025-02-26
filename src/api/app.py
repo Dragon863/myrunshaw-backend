@@ -1,4 +1,5 @@
 import json
+import re
 from typing import Optional
 import aiohttp
 import asyncpg
@@ -149,7 +150,7 @@ async def get_name(req: Request, user_id: str, auth_user: dict = Depends(authent
 async def get_names(
     req: Request, body: BatchGetBody, auth_user: dict = Depends(authenticate)
 ):
-    """Fetch the names of multiple users by their IDs."""
+    """Fetch the names of multiple users by their IDs. Called on app startup."""
     try:
         names = {}
         async with aiohttp.ClientSession() as session:
@@ -199,11 +200,11 @@ def user_exists(user_id):
     dependencies=[Depends(authenticate), Depends(security)],
     tags=["Friends"],
 )
-async def block_user(
+async def unfriend_user(
     req: Request,
     blocked_id_body: BlockedID,
 ):
-    """Block a user by their ID."""
+    """Unfriends a user by their ID. Route name preserved for backward compatibility"""
 
     try:
         async with db_pool.acquire() as conn:
@@ -236,7 +237,7 @@ async def unblock_user(
     req: Request,
     blocked_id: BlockedID,
 ):
-    """Unblock a user by their ID."""
+    """Block a user by their ID."""
 
     try:
         async with db_pool.acquire() as conn:
@@ -321,7 +322,7 @@ async def get_timetable(
     tags=["Timetable"],
 )
 async def batch_get_timetable(req: Request, request_body: BatchGetBody):
-    """Fetch the timetables for multiple users."""
+    """Fetch the timetables for multiple users. Called on app startup"""
     user_ids = request_body.user_ids
     if not req.user_id:
         return JSONResponse({"error": "No user IDs provided"}, 400)
@@ -375,6 +376,9 @@ async def batch_get_timetable(req: Request, request_body: BatchGetBody):
     tags=["Buses"],
 )
 async def get_buses(req: Request):
+    """
+    Gets bus bay information from the database
+    """
     async with db_pool.acquire() as conn:
         buses = await conn.fetch("SELECT * FROM bus")
         return [dict(bus) for bus in buses]
@@ -386,6 +390,9 @@ async def get_buses(req: Request):
     tags=["Buses"],
 )
 async def get_bus_for(req: Request, user_id: str):
+    """
+    Gets the bus number for a user with the given ID as a query parameter
+    """
     async with db_pool.acquire() as conn:
         friendship = await conn.fetchrow(
             """SELECT * FROM friend_requests
@@ -411,6 +418,9 @@ async def get_bus_for(req: Request, user_id: str):
     tags=["Buses"],
 )
 async def add_extra_buses(req: Request, buses: ExtraBusRequestBody):
+    """
+    Subscribe to a bus number for push notifications
+    """
     if not buses.bus_number:
         return JSONResponse({"error": "bus_number is required"}, 400)
 
@@ -434,6 +444,9 @@ async def add_extra_buses(req: Request, buses: ExtraBusRequestBody):
     tags=["Buses"],
 )
 async def remove_extra_buses(req: Request, buses: ExtraBusRequestBody):
+    """
+    Unsubscribe from a bus number for push notifications
+    """
     if not buses.bus_number:
         return JSONResponse({"error": "bus_number is required"}, 400)
 
@@ -457,6 +470,9 @@ async def remove_extra_buses(req: Request, buses: ExtraBusRequestBody):
     tags=["Buses"],
 )
 async def get_extra_buses(req: Request):
+    """
+    Get the extra bus numbers the user is subscribed to for push notifications
+    """
     async with db_pool.acquire() as conn:
         buses = await conn.fetch(
             "SELECT bus FROM extra_bus_subscriptions WHERE user_id = $1", req.user_id
@@ -573,6 +589,9 @@ async def update_pfp_version(req: Request):
     tags=["Friends"],
 )
 async def send_friend_request(req: Request, request_body: FriendRequestBody):
+    """
+    Send a friend request to a user by their ID.
+    """
     receiver = request_body.receiver_id.lower()
     sender = req.user_id.lower()
 
@@ -644,7 +663,12 @@ async def get_friend_requests(req: Request, status: str = "pending"):
     dependencies=[Depends(authenticate), Depends(security)],
     tags=["Friends"],
 )
-async def handle_friend_request(request_id: int, request_body: FriendRequestHandleBody):
+async def handle_friend_request(
+    req: Request, request_id: int, request_body: FriendRequestHandleBody
+):
+    """
+    Accept or decline a friend request by its ID.
+    """
     action = request_body.action
     if action not in ["accept", "decline"]:
         return JSONResponse({"error": "Invalid action"}, 400)
@@ -656,7 +680,7 @@ async def handle_friend_request(request_id: int, request_body: FriendRequestHand
         if not request:
             return JSONResponse({"error": "Friend request not found"}, 404)
 
-        if request["receiver_id"] != request["receiver_id"]:
+        if request["receiver_id"] != req.user_id:
             return JSONResponse({"error": "Unauthorised access"}, 403)
 
         if request["status"] != "pending":
@@ -678,15 +702,52 @@ async def handle_friend_request(request_id: int, request_body: FriendRequestHand
             )
             return JSONResponse({"message": "Friend request accepted"}, 200)
         else:
+            try:
+                await conn.execute(
+                    """DELETE FROM friend_requests 
+                    WHERE (sender_id = $1 AND receiver_id = $2) 
+                        OR (sender_id = $2 AND receiver_id = $1)""",
+                    request["sender_id"],
+                    request["receiver_id"],
+                )
+
+                sendNotification(
+                    message="Your friend request has been declined.",
+                    userIds=[request["sender_id"]],
+                    title="Friend Request Declined",
+                    ttl=60 * 60 * 24 * 2,
+                    small_icon="friend",
+                )
+                return JSONResponse({"message": "Friend request declined"}, 200)
+            except Exception as e:
+                return JSONResponse({"error": "Failed to decline friend request"}, 500)
+
+
+@app.post(
+    "/api/timetable/associate",
+    dependencies=[Depends(authenticate), Depends(security)],
+    tags=["Timetable"],
+)
+async def get_meta(req: Request, body: TimetableAssociationBody):
+    """New in version 1.3.0 as migration to daily updating of timetables begins"""
+    pattern = re.compile(r"https://webservices\.runshaw\.ac\.uk/timetable\.ashx\?id=.*")
+    if not pattern.match(body.url):
+        return JSONResponse(
+            {"error": "Invalid URL. Must be a Runshaw timetable URL"}, 400
+        )
+    try:
+        async with db_pool.acquire() as conn:
             await conn.execute(
-                "UPDATE friend_requests SET status = 'declined' WHERE id = $1",
-                request_id,
+                """
+                INSERT INTO timetable_associations (user_id, url)
+                VALUES ($1, $2)
+                ON CONFLICT (user_id) DO UPDATE SET url = $2
+                """,
+                req.user_id,
+                body.url,
             )
-            sendNotification(
-                message="Your friend request has been declined.",
-                userIds=[request["sender_id"]],
-                title="Friend Request Declined",
-                ttl=60 * 60 * 24 * 2,
-                small_icon="friend",
+            return JSONResponse(
+                {"message": "Timetable URL associated successfully"}, 201
             )
-            return JSONResponse({"message": "Friend request declined"}, 200)
+    except Exception as e:
+        return JSONResponse({"error": "Failed to associate timetable URL"}, 500)

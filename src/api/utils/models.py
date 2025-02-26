@@ -24,3 +24,7 @@ class FriendRequestBody(BaseModel):
 
 class FriendRequestHandleBody(BaseModel):
     action: str
+
+
+class TimetableAssociationBody(BaseModel):
+    url: str  # Url of timetable
