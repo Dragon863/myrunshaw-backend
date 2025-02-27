@@ -119,6 +119,7 @@ async def get_friends(req: Request, auth_user: dict = Depends(authenticate)):
                 """SELECT * FROM friend_requests 
                     WHERE (sender_id = $1 OR receiver_id = $1)
                     AND status = 'accepted'
+                    ORDER BY updated_at ASC
                 """,
                 req.user_id.lower(),
             )
@@ -406,10 +407,25 @@ async def get_bus_for(req: Request, user_id: str):
         if not friendship:
             return JSONResponse({"error": "Unauthorised access"}, 403)
 
+        buses = await conn.fetch(
+            "SELECT bus FROM extra_bus_subscriptions WHERE user_id = $1", user_id
+        )
+
     users = Users(adminClient)
     user = users.get(user_id)
-    preferences: dict = user.get("prefs", {"bus_number": "Not Set"})
-    return JSONResponse(preferences.get("bus_number", "Not Set"))
+    preferences: dict = user.get("prefs", {"bus_number": None})
+
+    toReturn = []
+    if preferences["bus_number"]:
+        toReturn.append(preferences["bus_number"])
+
+    for bus in buses:
+        print(bus)
+        toReturn.append(bus["bus"])
+
+    if len(toReturn) == 0:
+        return JSONResponse("Not set")
+    return JSONResponse(", ".join(toReturn))
 
 
 @app.post(

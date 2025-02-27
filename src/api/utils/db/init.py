@@ -104,8 +104,9 @@ async def init_db(db_pool):
             """
             CREATE TABLE IF NOT EXISTS extra_bus_subscriptions (
                 id SERIAL PRIMARY KEY,
-                user_id TEXT NOT NULL,
-                bus TEXT NOT NULL DEFAULT ''
+                user_id TEXT NOT NULL ,
+                bus TEXT NOT NULL DEFAULT '',
+                UNIQUE(user_id, bus)
             )
             """
         )
