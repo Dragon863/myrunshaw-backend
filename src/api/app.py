@@ -41,6 +41,9 @@ db_pool = None
 
 
 async def startup_event():
+    print(
+        "\x1b[31m****WARNING: Please ensure cron job for sync engine is enabled and functioning correctly****\x1b[0m"
+    )
     global db_pool
     db_pool = await connect_db()
     await init_db(db_pool)
@@ -420,7 +423,6 @@ async def get_bus_for(req: Request, user_id: str):
         toReturn.append(preferences["bus_number"])
 
     for bus in buses:
-        print(bus)
         toReturn.append(bus["bus"])
 
     if len(toReturn) == 0:
@@ -767,3 +769,14 @@ async def get_meta(req: Request, body: TimetableAssociationBody):
             )
     except Exception as e:
         return JSONResponse({"error": "Failed to associate timetable URL"}, 500)
+
+
+@app.get(
+    "/ping",
+    tags=["Healthcheck"],
+)
+async def ping():
+    """
+    Called by Uptime Kuma to check the health of the API
+    """
+    return JSONResponse({"message": "pong"})

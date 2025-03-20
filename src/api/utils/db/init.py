@@ -31,7 +31,7 @@ async def init_db(db_pool):
             CREATE TABLE IF NOT EXISTS profile_pics (
                 id SERIAL PRIMARY KEY,
                 user_id TEXT NOT NULL,
-                version INTEGER NOT NULL,
+                version INTEGER NOT NULL, 
                 UNIQUE(user_id)
             )
             """

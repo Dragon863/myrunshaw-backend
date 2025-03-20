@@ -18,3 +18,13 @@ services:
     restart: unless-stopped
     container_name: myrunshaw-api
     network_mode: host
+
+  sync_engine:
+    build: 
+      context: src/sync-engine
+    env_file:
+      - src/sync-engine/.env
+    restart: no # This is a task run by a cron job daily
+    container_name: myrunshaw-sync-engine
+    network_mode: host
+    
