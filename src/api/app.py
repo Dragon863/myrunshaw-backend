@@ -75,6 +75,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Analytics
 app.add_middleware(
     ApitallyMiddleware,
     client_id=getFromEnv("APITALLY_CLIENT_ID"),

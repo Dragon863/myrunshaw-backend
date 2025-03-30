@@ -12,15 +12,13 @@ from icalendar import Calendar
 import psycopg2
 import os
 import dotenv
+import pytz
 
 dotenv.load_dotenv()
 
 conn = psycopg2.connect(
     f"user=postgres password={os.getenv('DATABASE_PWD')} host=localhost"
 )
-
-import pytz
-
 
 def parse_timetable(ics_url):
     response = requests.get(ics_url)
@@ -43,7 +41,6 @@ def parse_timetable(ics_url):
             dtend = component.get("dtend").dt
             dtstamp = component.get("dtstamp").dt
 
-            # Convert from UTC to Europe/London
             if dtstart.tzinfo is None:
                 dtstart = pytz.UTC.localize(dtstart)
             dtstart = dtstart.astimezone(london_tz)
