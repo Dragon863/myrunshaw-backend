@@ -367,7 +367,11 @@ async def batch_get_timetable(req: Request, request_body: BatchGetBody):
     return JSONResponse(
         {
             timetable["user_id"]: {
-                "data": json.loads(timetable["timetable"] or '{"data": []}')["data"],
+                "data": (
+                    json.loads(timetable["timetable"] or '{"data": []}')["data"]
+                    if type(timetable["timetable"]) == str
+                    else timetable["timetable"]
+                )
             }
             for timetable in timetables
         }

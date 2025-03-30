@@ -19,6 +19,8 @@ conn = psycopg2.connect(
     f"user=postgres password={os.getenv('DATABASE_PWD')} host=localhost"
 )
 
+import pytz
+
 
 def parse_timetable(ics_url):
     response = requests.get(ics_url)
@@ -33,28 +35,51 @@ def parse_timetable(ics_url):
         "data": [],
     }
 
+    london_tz = pytz.timezone("Europe/London")
+
     for component in cal.walk():
         if component.name == "VEVENT":
+            dtstart = component.get("dtstart").dt
+            dtend = component.get("dtend").dt
+            dtstamp = component.get("dtstamp").dt
+
+            # Convert from UTC to Europe/London
+            if dtstart.tzinfo is None:
+                dtstart = pytz.UTC.localize(dtstart)
+            dtstart = dtstart.astimezone(london_tz)
+
+            if dtend.tzinfo is None:
+                dtend = pytz.UTC.localize(dtend)
+            dtend = dtend.astimezone(london_tz)
+
+            if dtstamp.tzinfo is None:
+                dtstamp = pytz.UTC.localize(dtstamp)
+            dtstamp = dtstamp.astimezone(london_tz)
+
             event = {
                 "type": "VEVENT",
-                "dtstart": {
-                    "dt": component.get("dtstart").dt.strftime("%Y%m%dT%H%M%SZ")
-                },
-                "dtend": {"dt": component.get("dtend").dt.strftime("%Y%m%dT%H%M%SZ")},
-                "dtstamp": {
-                    "dt": component.get("dtstamp").dt.strftime("%Y%m%dT%H%M%SZ")
-                },
+                "dtstart": {"dt": dtstart.strftime("%Y%m%dT%H%M%S")},
+                "dtend": {"dt": dtend.strftime("%Y%m%dT%H%M%S")},
+                "dtstamp": {"dt": dtstamp.strftime("%Y%m%dT%H%M%S")},
                 "uid": str(uuid.uuid4()),
                 "created": (
-                    {"dt": component.get("created").dt.strftime("%Y%m%dT%H%M%SZ")}
+                    {
+                        "dt": component.get("created")
+                        .dt.astimezone(london_tz)
+                        .strftime("%Y%m%dT%H%M%S")
+                    }
                     if component.get("created")
-                    else {"dt": component.get("dtstamp").dt.strftime("%Y%m%dT%H%M%SZ")}
+                    else {"dt": dtstamp.strftime("%Y%m%dT%H%M%S")}
                 ),
                 "description": component.get("description"),
                 "lastModified": (
-                    {"dt": component.get("last-modified").dt.strftime("%Y%m%dT%H%M%SZ")}
+                    {
+                        "dt": component.get("last-modified")
+                        .dt.astimezone(london_tz)
+                        .strftime("%Y%m%dT%H%M%S")
+                    }
                     if component.get("last-modified")
-                    else {"dt": component.get("dtstamp").dt.strftime("%Y%m%dT%H%M%SZ")}
+                    else {"dt": dtstamp.strftime("%Y%m%dT%H%M%S")}
                 ),
                 "location": component.get("location"),
                 "sequence": str(component.get("sequence", "0")),
