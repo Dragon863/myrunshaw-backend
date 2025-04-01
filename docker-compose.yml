@@ -9,6 +9,8 @@ services:
     restart: unless-stopped
     container_name: myrunshaw-bus-worker
     network_mode: host
+    environment:
+      - TZ=Europe/London
 
   api:
     build: 
@@ -18,6 +20,8 @@ services:
     restart: unless-stopped
     container_name: myrunshaw-api
     network_mode: host
+    environment:
+      - TZ=Europe/London
 
   sync_engine:
     build: 
@@ -27,4 +31,5 @@ services:
     restart: no # This is a task run by a cron job daily
     container_name: myrunshaw-sync-engine
     network_mode: host
-    
+    environment:
+      - TZ=Europe/London
