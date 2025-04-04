@@ -10,6 +10,7 @@ from appwrite.services.users import Users
 from fastapi import FastAPI, Depends, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sync import sync_timetable_for
 from utils.env import getFromEnv
 from utils.db.init import init_db
 from utils.models import *
@@ -266,16 +267,18 @@ async def add_timetable(
 ):
     """Add a timetable to the authenticated user's account."""
     try:
-        async with db_pool.acquire() as conn:
-            await conn.execute(
-                """INSERT INTO timetables (user_id, timetable)
-                VALUES ($1, $2)
-                ON CONFLICT (user_id)
-                DO UPDATE SET timetable = $2, updated_at = CURRENT_TIMESTAMP""",
-                req.user_id.lower(),
-                json.dumps(timetable.dict()["timetable"]),
-            )
-            return JSONResponse({"message": "Timetable uploaded successfully"}, 201)
+        # async with db_pool.acquire() as conn:
+        #     await conn.execute(
+        #         """INSERT INTO timetables (user_id, timetable)
+        #         VALUES ($1, $2)
+        #         ON CONFLICT (user_id)
+        #         DO UPDATE SET timetable = $2, updated_at = CURRENT_TIMESTAMP""",
+        #         req.user_id.lower(),
+        #         json.dumps(timetable.dict()["timetable"]),
+        #     )
+        return JSONResponse({"message": "Timetable uploaded successfully"}, 201)
+        # Logic removed in version 1.3.2 due to legacy sync deprecation
+        # This is because the sync engine now handles this
     except Exception as e:
         return JSONResponse({"error": "Failed to upload timetable"}, 500)
 
@@ -771,6 +774,7 @@ async def get_meta(req: Request, body: TimetableAssociationBody):
                 req.user_id,
                 body.url,
             )
+            await sync_timetable_for(req.user_id, body.url)
             return JSONResponse(
                 {"message": "Timetable URL associated successfully"}, 201
             )

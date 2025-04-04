@@ -9,3 +9,5 @@ onesignal-python-api
 aiohttp
 requests
 apitally[fastapi]
+icalendar
+pytz
