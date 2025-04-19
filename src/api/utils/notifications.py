@@ -22,7 +22,7 @@ def sendNotification(
     title: str = "Notification",
     ttl: int = 60 * 10,
     filters: list = [],
-    channel: str = os.getenv("ONESIGNAL_GENERIC_CHANNEL"),
+    # channel: str = os.getenv("ONESIGNAL_GENERIC_CHANNEL"),
     priority: int = 10,
     small_icon="ic_stat_onesignal_default",
 ):
@@ -39,7 +39,7 @@ def sendNotification(
         ttl=ttl,
         headings={"en": title},
         filters=filters,
-        android_channel_id=channel,
+        # android_channel_id=channel,
         android_accent_color="E63009",
         is_android=True,
         is_ios=True,
