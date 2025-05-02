@@ -144,10 +144,16 @@ async def parseSite():
             # Check if bay has changed, also we should probably ignore transitions to "0"
             if old_bay != new_bay and new_bay != "0":
                 print(f"Bus {bus_id} changed from bay {old_bay} to bay {new_bay}")
+                if old_bay == "0":
+                    message = f"The {bus_id} bus has arrived in bay {new_bay}"
+                else:
+                    message = (
+                        f"The {bus_id} bus has moved from bay {old_bay} to {new_bay}"
+                    )
 
                 # Notify about bus updates
                 sendNotification(
-                    f"The {bus_id} bus has arrived in bay {new_bay}",
+                    message,
                     title="Bus Update!",
                     filters=[
                         Filter(field="tag", key="bus", relation="=", value=bus_id),
@@ -168,7 +174,7 @@ async def parseSite():
 
                 if ids:
                     sendNotification(
-                        f"The {bus_id} bus has arrived in bay {new_bay}",
+                        message,
                         userIds=ids,
                         title="Bus Update!",
                         channel=os.getenv("ONESIGNAL_BUS_CHANNEL"),
