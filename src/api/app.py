@@ -66,6 +66,12 @@ app = FastAPI(
         "url": "https://danieldb.uk",
     },
     terms_of_service="https://privacy.danieldb.uk/terms",
+    servers=[
+        {
+            "url": "https://runshaw-api.danieldb.uk",
+            "description": "Production server",
+        },
+    ],
 )
 
 app.add_middleware(
@@ -192,7 +198,7 @@ async def get_names(
     "/api/exists/{user_id}",
     tags=["Auth"],
 )
-def user_exists(user_id):
+def user_exists(user_id: str):
     try:
         users = Users(adminClient)
         users.get(user_id)
@@ -290,7 +296,7 @@ async def add_timetable(
 )
 async def get_timetable(
     req: Request,
-    user_id: Optional[str] = None,
+    user_id: Optional[str],
 ):
     """
     Fetch the timetable for a user. If `user_id` is not provided, fetch the timetable
