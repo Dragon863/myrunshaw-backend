@@ -24,7 +24,7 @@ async def validateToken(req: Request):
         authClient.set_jwt(token)
         account = Account(authClient)
         user = account.get()
-        req.user_id = user["$id"]
+        req.user_id = user["$id"].lower()
         return user
     except Exception as e:
         raise HTTPException(status_code=401, detail="Unauthorized; invalid token.")
