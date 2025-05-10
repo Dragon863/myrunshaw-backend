@@ -1,4 +1,4 @@
-async def init_db(db_pool):
+async def init_db(db_pool, logger):
     async with db_pool.acquire() as conn:
         await conn.execute(
             """
@@ -51,7 +51,7 @@ async def init_db(db_pool):
             )
             """
         )
-        print("Reversed duplicate records removed.")
+        logger.debug("Reversed duplicate records removed.")
 
         # Update sender_id and receiver_id to lowercase
         await conn.execute(

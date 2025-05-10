@@ -145,11 +145,9 @@ async def parseSite():
             if old_bay != new_bay and new_bay != "0":
                 print(f"Bus {bus_id} changed from bay {old_bay} to bay {new_bay}")
                 if old_bay == "0":
-                    message = f"The {bus_id} bus has arrived in bay {new_bay}"
+                    message = f"The {bus_id} has arrived in bay {new_bay}"
                 else:
-                    message = (
-                        f"The {bus_id} bus has moved from bay {old_bay} to {new_bay}"
-                    )
+                    message = f"The {bus_id} has moved from bay {old_bay} to {new_bay}"
 
                 # Notify about bus updates
                 sendNotification(
@@ -189,6 +187,8 @@ async def runLoop():
     else:
         print("\x1b[32m**** Bus Worker is online in PRODUCTION env! ****\x1b[0m")
     await prepareDB()
+    notified_admins = False
+
     while True:
         try:
             current_time = datetime.now()
@@ -197,6 +197,17 @@ async def runLoop():
                     await conn.execute("UPDATE bus SET bus_bay = '0'")
             elif (current_time.hour in [15, 16]) or DEBUG:
                 await parseSite()
+                if not notified_admins:
+                    sendNotification(
+                        "Hello! I've started checking for bus updates.",
+                        userIds=[os.getenv("ADMIN_STUDENT_ID")],
+                        title="Bus Worker",
+                        channel=os.getenv("ONESIGNAL_GENERIC_CHANNEL"),
+                    )
+                    notified_admins = True
+            else:
+                notified_admins = False
+
         except Exception as e:
             print(f"Error in main loop: {e}")
 
