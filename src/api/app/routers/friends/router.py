@@ -2,6 +2,8 @@ import aiohttp
 import asyncpg
 from fastapi import Depends, APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
+import redis
+from app.utils.cache.redis import get_redis_conn
 from app.utils.env import getFromEnv
 from app.utils.models import (
     BatchGetBody,
@@ -74,37 +76,77 @@ async def get_name(
     tags=["Friends"],
 )
 async def get_names(
-    req: Request, body: BatchGetBody, auth_user: dict = Depends(validateToken)
+    req: Request,
+    body: BatchGetBody,
+    auth_user: dict = Depends(validateToken),
+    redis_conn: redis.Redis = Depends(get_redis_conn),
 ):
-    """Fetch the names of multiple users by their IDs. Called on app startup."""
+    """Fetch the names of multiple users by their IDs. Called on app startup.
+    Uses Redis for caching."""
     try:
         names = {}
-        async with aiohttp.ClientSession() as session:
-            for user_id in body.user_ids:
-                try:
-                    api_res = await session.get(
-                        f"{getFromEnv('APPWRITE_ENDPOINT')}/users/{user_id}",
-                        headers={
-                            "x-appwrite-project": getFromEnv("APPWRITE_PROJECT_ID"),
-                            "x-appwrite-key": getFromEnv("APPWRITE_API_KEY"),
-                            "user-agent": "ApppwritePythonSDK/7.0.0",
-                            "x-sdk-name": "Python",
-                            "x-sdk-platform": "server",
-                            "x-sdk-language": "python",
-                            "x-sdk-version": "7.0.0",
-                            "content-type": "application/json",
-                        },
-                    )
-                    user = await api_res.json()
-                    names[user_id] = user["name"]
-                except Exception as e:
-                    names[user_id] = "Unknown User"
-            return JSONResponse(
-                names,
-                media_type="application/json",
-                headers={"Content-Type": "application/json; charset=utf-8"},
-            )
+        user_ids_to_fetch_from_appwrite = []
+        cache_prefix = "user_name:"
+        # technically I don't need a TTL at all, but this is just in case the cache container goes down with appwrite staying up
+        cache_ttl_seconds = 60 * 60 * 24 * 7
+
+        # step 1: check cache
+        for user_id in body.user_ids:
+            cached_name = await redis_conn.get(f"{cache_prefix}{user_id}")
+            if cached_name:
+                names[user_id] = cached_name
+            else:
+                user_ids_to_fetch_from_appwrite.append(user_id)
+
+        # step 2: fetch from appwrite
+        if user_ids_to_fetch_from_appwrite:
+            async with aiohttp.ClientSession() as session:
+                for user_id in user_ids_to_fetch_from_appwrite:
+                    try:
+                        api_res = await session.get(
+                            f"{getFromEnv('APPWRITE_ENDPOINT')}/users/{user_id}",
+                            headers={
+                                "x-appwrite-project": getFromEnv("APPWRITE_PROJECT_ID"),
+                                "x-appwrite-key": getFromEnv("APPWRITE_API_KEY"),
+                                "user-agent": "ApppwritePythonSDK/7.0.0",
+                                "x-sdk-name": "Python",
+                                "x-sdk-platform": "server",
+                                "x-sdk-language": "python",
+                                "x-sdk-version": "7.0.0",
+                                "content-type": "application/json",
+                            },
+                        )
+                        user_data = await api_res.json()
+                        if api_res.status == 200 and "name" in user_data:
+                            user_name = user_data["name"]
+                            names[user_id] = user_name
+                            # cache it
+                            await redis_conn.set(
+                                f"{cache_prefix}{user_id}",
+                                user_name,
+                                ex=cache_ttl_seconds,
+                            )
+                        else:
+                            names[user_id] = "Unknown User"
+                            await redis_conn.set(
+                                f"{cache_prefix}{user_id}", "Unknown User", ex=600
+                            )  # prevents a bunch of requests
+                    except Exception as e:
+                        # Consider logging the error e
+                        names[user_id] = "Unknown User"
+
+        # all requested user_ids must have an entry in the response
+        for user_id in body.user_ids:
+            if user_id not in names:
+                names[user_id] = "Unknown User"  # fallback just in case
+
+        return JSONResponse(
+            names,
+            media_type="application/json",
+            headers={"Content-Type": "application/json; charset=utf-8"},
+        )
     except Exception as e:
+        # Consider logging the error e
         return JSONResponse({"error": "Failed to fetch names"}, status_code=500)
 
 

@@ -100,9 +100,7 @@ async def batch_get_timetable(
     user_ids = request_body.user_ids
     if not req.user_id:
         return JSONResponse({"error": "No user IDs provided"}, 400)
-    print(user_ids)
     for user_id in user_ids:
-        print("UID: " + user_id)
         friendship = await conn.fetchrow(
             """SELECT * FROM friend_requests
             WHERE status = 'accepted'
@@ -146,7 +144,6 @@ async def batch_get_timetable(
             for timetable in timetables
         }
     )
-    print(resp.body)
     return resp
 
 

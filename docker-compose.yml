@@ -31,3 +31,14 @@ services:
     network_mode: host
     environment:
       - TZ=Europe/London
+
+  name_cache:
+    build: 
+      context: src/name-cache
+    env_file:
+      - src/name-cache/.env
+    restart: unless-stopped
+    container_name: myrunshaw-redis-webhook-engine
+    network_mode: host
+    environment:
+      - TZ=Europe/London
