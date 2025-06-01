@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 from fastapi.security.http import HTTPBearer
 from apitally.fastapi import ApitallyMiddleware
 
-from api.app.utils.logging import EndpointFilter
+from app.utils.logging import EndpointFilter
 from app.utils.cache.redis import close_redis_pool, initialise_redis_pool
 from app.utils.db.pool import initialise_db_pool, close_db_pool
 from app.utils.env import getFromEnv
