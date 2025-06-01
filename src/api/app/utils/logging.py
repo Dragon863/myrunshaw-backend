@@ -1,3 +1,7 @@
+import logging
+import typing
+
+
 class LogLevel:
     INFO = "INFO"
     WARNING = "WARNING"
@@ -29,3 +33,17 @@ class Logger:
     def critical(self, message):
         self.log(LogLevel.CRITICAL, "\x1b[35m" + message + "\x1b[0m")
 
+
+class EndpointFilter(logging.Filter):
+    # https://github.com/encode/starlette/issues/864#issuecomment-1254987630
+    def __init__(
+        self,
+        path: str,
+        *args: typing.Any,
+        **kwargs: typing.Any,
+    ):
+        super().__init__(*args, **kwargs)
+        self._path = path
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return record.getMessage().find(self._path) == -1
