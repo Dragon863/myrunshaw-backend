@@ -2,7 +2,6 @@ import re
 import asyncpg
 from fastapi import Depends, APIRouter, Request
 from fastapi.responses import JSONResponse
-from typing import Optional
 import json
 from app.sync import sync_timetable_for
 from app.utils.auth import validateToken, jwtToken

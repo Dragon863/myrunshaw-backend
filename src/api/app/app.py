@@ -16,6 +16,7 @@ from app.routers.buses.router import busesRouter
 from app.routers.friends.router import friendsRouter
 from app.routers.profilepics.router import profilePicsRouter
 from app.routers.timetable.router import timetableRouter
+from app.routers.payment.router import paymentRouter
 
 DATABASE_URL = getFromEnv("DATABASE_URL")
 
@@ -49,10 +50,15 @@ app = FastAPI(
             "url": "https://runshaw-api.danieldb.uk",
             "description": "Production server",
         },
+        {
+            "url": "http://localhost:5006",
+            "description": "Local development server",
+        },
     ],
 )
 
 for router in [
+    paymentRouter,
     authRouter,
     busesRouter,
     friendsRouter,
@@ -70,6 +76,7 @@ app.add_middleware(
 )
 
 # analytics
+
 app.add_middleware(
     ApitallyMiddleware,
     client_id=getFromEnv("APITALLY_CLIENT_ID"),
