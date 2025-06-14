@@ -183,3 +183,45 @@ async def get_transactions(
                 status_code=408,
                 detail="Request to RunshawPay timed out. Please try again later.",
             )
+
+
+@paymentRouter.get(
+    "/deeplink",
+    dependencies=[Depends(validateToken), Depends(jwtToken)],
+    tags=["Payments"],
+)
+async def get_deeplink(
+    req: Request,
+    conn: asyncpg.Connection = Depends(get_db_conn),
+):
+    """
+    Get the associated deeplink for topping up
+    """
+    try:
+        async with conn.transaction():
+            result = await conn.fetchrow(
+                "SELECT url FROM timetable_associations WHERE user_id = $1",
+                req.user_id.lower(),
+            )
+            user_id = (
+                result["url"].split("?id=")[-1]
+                if result and "?" in result["url"]
+                else None
+            )
+
+            if not user_id:
+                raise HTTPException(
+                    status_code=404,
+                    detail="No timetable URL found for the user.",
+                )
+
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Timetable not synced",
+        )
+    url = getFromEnv("PAY_BALANCE_URL") + user_id
+    return JSONResponse(
+        {"deeplink": url},
+        status_code=200,
+    )
