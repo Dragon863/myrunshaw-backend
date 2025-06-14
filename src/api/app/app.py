@@ -58,12 +58,12 @@ app = FastAPI(
 )
 
 for router in [
-    paymentRouter,
     authRouter,
     busesRouter,
     friendsRouter,
     profilePicsRouter,
     timetableRouter,
+    paymentRouter,
 ]:
     app.include_router(router)
 

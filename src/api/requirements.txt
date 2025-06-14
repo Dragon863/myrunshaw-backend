@@ -12,3 +12,4 @@ apitally[fastapi]
 icalendar
 pytz
 redis
+lxml
