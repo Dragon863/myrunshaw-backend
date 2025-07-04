@@ -50,14 +50,9 @@ async def close_account(
         users.delete(req.user_id)
 
         await conn.execute(
-            "DELETE FROM blocked_users WHERE blocker_id = $1 OR blocked_id = $1",
+            "DELETE FROM users WHERE user_id = $1",
             req.user_id,
         )
-        await conn.execute(
-            "DELETE FROM friend_requests WHERE sender_id = $1 OR receiver_id = $1",
-            req.user_id,
-        )
-        await conn.execute("DELETE FROM timetables WHERE user_id = $1", req.user_id)
 
         app_id = getFromEnv("ONESIGNAL_APP_ID")
         alias_label = "external_id"

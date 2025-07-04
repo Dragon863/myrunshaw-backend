@@ -1,11 +1,21 @@
 async def init_db(db_pool, logger):
     async with db_pool.acquire() as conn:
+        # central user table for cascading deletes on the rest of the database
+        await conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                user_id TEXT PRIMARY KEY,
+                created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+
         await conn.execute(
             """
             CREATE TABLE IF NOT EXISTS blocked_users (
                 id SERIAL PRIMARY KEY,
-                blocker_id TEXT NOT NULL,
-                blocked_id TEXT NOT NULL,
+                blocker_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+                blocked_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
                 created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(blocker_id, blocked_id)
             )
@@ -16,8 +26,8 @@ async def init_db(db_pool, logger):
             """
             CREATE TABLE IF NOT EXISTS friend_requests (
                 id SERIAL PRIMARY KEY,
-                sender_id TEXT NOT NULL,
-                receiver_id TEXT NOT NULL,
+                sender_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+                receiver_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
                 status TEXT CHECK(status IN ('pending', 'accepted', 'declined')) DEFAULT 'pending',
                 created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
@@ -26,11 +36,12 @@ async def init_db(db_pool, logger):
             """
         )
 
+        # cache helper
         await conn.execute(
             """
             CREATE TABLE IF NOT EXISTS profile_pics (
                 id SERIAL PRIMARY KEY,
-                user_id TEXT NOT NULL,
+                user_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
                 version INTEGER NOT NULL, 
                 UNIQUE(user_id)
             )
@@ -53,7 +64,7 @@ async def init_db(db_pool, logger):
         )
         logger.debug("Reversed duplicate records removed.")
 
-        # Update sender_id and receiver_id to lowercase
+        # Update sender_id and receiver_id to lowercase - shouldn't be necessary, but just to be safe
         await conn.execute(
             """
             UPDATE friend_requests
@@ -62,12 +73,12 @@ async def init_db(db_pool, logger):
             """
         )
 
-        # Set up the timetables table
+        # set up the timetables
         await conn.execute(
             """
             CREATE TABLE IF NOT EXISTS timetables (
                 id SERIAL PRIMARY KEY,
-                user_id TEXT NOT NULL,
+                user_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
                 timetable JSONB NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -81,7 +92,7 @@ async def init_db(db_pool, logger):
             """
             CREATE TABLE IF NOT EXISTS timetable_associations (
                 id SERIAL PRIMARY KEY,
-                user_id TEXT NOT NULL,
+                user_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
                 url TEXT NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -104,7 +115,7 @@ async def init_db(db_pool, logger):
             """
             CREATE TABLE IF NOT EXISTS extra_bus_subscriptions (
                 id SERIAL PRIMARY KEY,
-                user_id TEXT NOT NULL ,
+                user_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
                 bus TEXT NOT NULL DEFAULT '',
                 UNIQUE(user_id, bus)
             )

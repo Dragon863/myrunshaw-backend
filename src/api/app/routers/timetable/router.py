@@ -60,9 +60,10 @@ async def get_timetable(
     for the requester. Only allow access if the requester is the user or their friend.
     """
 
-    user_id = user_id or req.user_id  # If user_id_for is None, use the requester's ID
+    user_id = user_id or req.user_id  # if user_id_for is None, use the requester's ID
 
     if user_id != req.user_id:
+        # not fetching the requester's timetable, so check friendship. viewing is only allowed if the user is a friend
         friendship = await conn.fetchrow(
             """SELECT * FROM friend_requests
             WHERE status = 'accepted'
@@ -74,7 +75,7 @@ async def get_timetable(
         )
         if not friendship:
             return JSONResponse({"error": "Unauthorised access"}, 403)
-
+    
     timetable = await conn.fetchval(
         "SELECT timetable FROM timetables WHERE user_id = $1", user_id.lower()
     )
