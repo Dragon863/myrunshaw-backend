@@ -54,12 +54,12 @@ async def update_pfp_version(
 ):
     """Update the version of a user's profile picture."""
     current_version = await conn.fetchval(
-        "SELECT version FROM profile_pics WHERE user_id = $1", req.user_id
+        "SELECT version FROM profile_pics WHERE user_id = $1", req.state.user_id
     )
     if not current_version:
         await conn.execute(
             "INSERT INTO profile_pics (user_id, version) VALUES ($1, $2)",
-            req.user_id,
+            req.state.user_id,
             1,
         )
     else:
@@ -68,7 +68,7 @@ async def update_pfp_version(
         await conn.execute(
             "UPDATE profile_pics SET version = $1 WHERE user_id = $2",
             new_version,
-            req.user_id,
+            req.state.user_id,
         )
 
     return JSONResponse(

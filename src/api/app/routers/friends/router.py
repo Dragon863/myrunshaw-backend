@@ -42,7 +42,7 @@ async def get_friends(
                 AND status = 'accepted'
                 ORDER BY updated_at ASC
             """,
-            req.user_id.lower(),
+            req.state.user_id.lower(),
         )
         return [dict(row) for row in rows]
     except Exception as e:
@@ -167,12 +167,12 @@ async def unfriend_user(
             """DELETE FROM friend_requests 
             WHERE (sender_id = $1 AND receiver_id = $2) 
                 OR (sender_id = $2 AND receiver_id = $1)""",
-            req.user_id.lower(),
+            req.state.user_id.lower(),
             blocked_id_body.blocked_id.lower(),
         )
         await conn.execute(
             "INSERT INTO blocked_users (blocker_id, blocked_id) VALUES ($1, $2)",
-            req.user_id.lower(),
+            req.state.user_id.lower(),
             blocked_id_body.blocked_id.lower(),
         )
         return JSONResponse(
@@ -198,7 +198,7 @@ async def unblock_user(
     try:
         await conn.execute(
             "DELETE FROM blocked_users WHERE blocker_id = $1 AND blocked_id = $2",
-            (req.user_id.lower(), blocked_id.lower()),
+            (req.state.user_id.lower(), blocked_id.lower()),
         )
         return JSONResponse({"message": "User unblocked successfully"}, 201)
     except Exception as e:
@@ -220,7 +220,7 @@ async def send_friend_request(
     Send a friend request to a user by their ID.
     """
     receiver = request_body.receiver_id.lower()
-    sender = req.user_id.lower()
+    sender = req.state.user_id.lower()
 
     if not receiver:
         return JSONResponse({"error": "receiver_id is required"}, 400)
@@ -279,7 +279,7 @@ async def get_friend_requests(
     try:
         rows = await conn.fetch(
             "SELECT * FROM friend_requests WHERE receiver_id = $1 AND status = $2",
-            req.user_id,
+            req.state.user_id,
             status,
         )
         return [dict(row) for row in rows]
@@ -311,7 +311,7 @@ async def handle_friend_request(
     if not request:
         return JSONResponse({"error": "Friend request not found"}, 404)
 
-    if request["receiver_id"] != req.user_id:
+    if request["receiver_id"] != req.state.user_id:
         return JSONResponse({"error": "Unauthorised access"}, 403)
 
     if request["status"] != "pending":

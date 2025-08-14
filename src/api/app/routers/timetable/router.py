@@ -35,7 +35,7 @@ async def add_timetable(
         #         VALUES ($1, $2)
         #         ON CONFLICT (user_id)
         #         DO UPDATE SET timetable = $2, updated_at = CURRENT_TIMESTAMP""",
-        #         req.user_id.lower(),
+        #         req.state.user_id.lower(),
         #         json.dumps(timetable.dict()["timetable"]),
         #     )
         return JSONResponse({"message": "Timetable uploaded successfully"}, 201)
@@ -60,9 +60,11 @@ async def get_timetable(
     for the requester. Only allow access if the requester is the user or their friend.
     """
 
-    user_id = user_id or req.user_id  # if user_id_for is None, use the requester's ID
+    user_id = (
+        user_id or req.state.user_id
+    )  # if user_id_for is None, use the requester's ID
 
-    if user_id != req.user_id:
+    if user_id != req.state.user_id:
         # not fetching the requester's timetable, so check friendship. viewing is only allowed if the user is a friend
         friendship = await conn.fetchrow(
             """SELECT * FROM friend_requests
@@ -70,12 +72,12 @@ async def get_timetable(
             AND ((sender_id = $1 AND receiver_id = $2)
             OR (sender_id = $2 AND receiver_id = $1))
             """,
-            req.user_id.lower(),
+            req.state.user_id.lower(),
             user_id.lower(),
         )
         if not friendship:
             return JSONResponse({"error": "Unauthorised access"}, 403)
-    
+
     timetable = await conn.fetchval(
         "SELECT timetable FROM timetables WHERE user_id = $1", user_id.lower()
     )
@@ -98,7 +100,7 @@ async def batch_get_timetable(
 ):
     """Fetch the timetables for multiple users. Called on app startup"""
     user_ids = request_body.user_ids
-    if not req.user_id:
+    if not req.state.user_id:
         return JSONResponse({"error": "No user IDs provided"}, 400)
     for user_id in user_ids:
         friendship = await conn.fetchrow(
@@ -107,10 +109,10 @@ async def batch_get_timetable(
             AND ((sender_id = $1 AND receiver_id = $2)
             OR (sender_id = $2 AND receiver_id = $1))
             """,
-            req.user_id.lower(),
+            req.state.user_id.lower(),
             user_id.lower(),
         )
-        if not friendship and not user_id == req.user_id:
+        if not friendship and not user_id == req.state.user_id:
             return JSONResponse({"error": "Unauthorised access"}, 403)
 
     timetables = await conn.fetch(
@@ -170,10 +172,10 @@ async def get_meta(
             VALUES ($1, $2)
             ON CONFLICT (user_id) DO UPDATE SET url = $2
             """,
-            req.user_id,
+            req.state.user_id,
             body.url,
         )
-        await sync_timetable_for(req.user_id, body.url)
+        await sync_timetable_for(req.state.user_id, body.url)
         return JSONResponse({"message": "Timetable URL associated successfully"}, 201)
     except Exception as e:
         return JSONResponse({"error": "Failed to associate timetable URL"}, 500)

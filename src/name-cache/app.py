@@ -28,7 +28,7 @@ try:
     )
     redis_client.ping()
     logger.info(f"Successfully connected to Redis at {REDIS_HOST}:{REDIS_PORT}")
-except redis.exceptions.ConnectionError as e:
+except redis.ConnectionError as e:
     logger.error(f"Could not connect to Redis: {e}")
     redis_client = None
 

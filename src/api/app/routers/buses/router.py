@@ -50,7 +50,7 @@ async def get_bus_for(
         AND ((sender_id = $1 AND receiver_id = $2)
         OR (sender_id = $2 AND receiver_id = $1))
         """,
-        req.user_id.lower(),
+        req.state.user_id.lower(),
         user_id.lower(),
     )
     if not friendship:
@@ -99,7 +99,7 @@ async def add_extra_buses(
     try:
         await conn.execute(
             "INSERT INTO extra_bus_subscriptions (user_id, bus) VALUES ($1, $2) ON CONFLICT DO NOTHING",
-            req.user_id,
+            req.state.user_id,
             bus_number,
         )
         return JSONResponse({"message": "Bus added successfully"}, 201)
@@ -128,7 +128,7 @@ async def remove_extra_buses(
     try:
         await conn.execute(
             "DELETE FROM extra_bus_subscriptions WHERE user_id = $1 AND bus = $2",
-            req.user_id,
+            req.state.user_id,
             bus_number,
         )
         return JSONResponse({"message": "Bus removed successfully"}, 201)
@@ -149,6 +149,6 @@ async def get_extra_buses(
     Get the extra bus numbers the user is subscribed to for push notifications
     """
     buses = await conn.fetch(
-        "SELECT bus FROM extra_bus_subscriptions WHERE user_id = $1", req.user_id
+        "SELECT bus FROM extra_bus_subscriptions WHERE user_id = $1", req.state.user_id
     )
     return [dict(bus) for bus in buses]

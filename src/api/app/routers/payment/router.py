@@ -1,5 +1,6 @@
 import asyncio
 import aiohttp
+from aiohttp import ClientTimeout
 import asyncpg
 from bs4 import BeautifulSoup
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -20,7 +21,7 @@ paymentRouter = APIRouter(tags=["Payments"], prefix="/api/payments")
     dependencies=[Depends(validateToken), Depends(jwtToken)],
     tags=["Payments"],
 )
-async def get_transactions(
+async def get_balance(
     req: Request,
     conn: asyncpg.Connection = Depends(get_db_conn),
 ):
@@ -32,7 +33,7 @@ async def get_transactions(
         async with conn.transaction():
             result = await conn.fetchrow(
                 "SELECT url FROM timetable_associations WHERE user_id = $1",
-                req.user_id.lower(),
+                req.state.user_id.lower(),
             )
             user_id = (
                 result["url"].split("?id=")[-1]
@@ -55,7 +56,7 @@ async def get_transactions(
 
     async with aiohttp.ClientSession() as session:
         try:
-            async with session.get(url, timeout=3) as response:
+            async with session.get(url, timeout=ClientTimeout(3)) as response:
                 response.raise_for_status()
                 html_content = await response.text()
         except asyncio.TimeoutError:
@@ -98,7 +99,7 @@ async def get_transactions(
         async with conn.transaction():
             result = await conn.fetchrow(
                 "SELECT url FROM timetable_associations WHERE user_id = $1",
-                req.user_id.lower(),
+                req.state.user_id.lower(),
             )
             user_id = (
                 result["url"].split("?id=")[-1]
@@ -123,7 +124,7 @@ async def get_transactions(
 
     async with aiohttp.ClientSession() as session:
         try:
-            async with session.get(url, timeout=5) as response:
+            async with session.get(url, timeout=ClientTimeout(5)) as response:
                 response.raise_for_status()
                 html_content = await response.text()
                 soup = BeautifulSoup(html_content, "lxml")
@@ -201,7 +202,7 @@ async def get_deeplink(
         async with conn.transaction():
             result = await conn.fetchrow(
                 "SELECT url FROM timetable_associations WHERE user_id = $1",
-                req.user_id.lower(),
+                req.state.user_id.lower(),
             )
             user_id = (
                 result["url"].split("?id=")[-1]
