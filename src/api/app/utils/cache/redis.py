@@ -5,7 +5,7 @@ from fastapi import HTTPException
 from app.utils.logging import Logger
 from app.utils.env import getFromEnv
 
-REDIS_HOST = getFromEnv("REDIS_HOST") 
+REDIS_HOST = getFromEnv("REDIS_HOST")
 REDIS_PORT = int(getFromEnv("REDIS_PORT"))
 
 redis_pool: typing.Optional[redis.Redis] = None
@@ -35,7 +35,7 @@ async def close_redis_pool():
     global redis_pool
     if redis_pool:
         logger.info("Closing Redis pool...")
-        await redis_pool.close()
+        await redis_pool.aclose()
         redis_pool = None
         logger.info("Redis pool closed.")
 

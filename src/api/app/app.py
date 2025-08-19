@@ -1,10 +1,10 @@
+import contextlib
 import logging
-import typing
+from apitally.fastapi import ApitallyMiddleware
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.security.http import HTTPBearer
-from apitally.fastapi import ApitallyMiddleware
 
 from app.utils.logging import EndpointFilter
 from app.utils.cache.redis import close_redis_pool, initialise_redis_pool
@@ -17,6 +17,7 @@ from app.routers.friends.router import friendsRouter
 from app.routers.profilepics.router import profilePicsRouter
 from app.routers.timetable.router import timetableRouter
 from app.routers.payment.router import paymentRouter
+from app.routers.admin.router import adminRouter
 
 DATABASE_URL = getFromEnv("DATABASE_URL")
 
@@ -34,12 +35,17 @@ async def app_shutdown_event():
     await close_redis_pool()
 
 
+@contextlib.asynccontextmanager
+async def lifespan(app):
+    await app_startup_event()
+    yield
+    await app_shutdown_event()
+
+
 app = FastAPI(
     title="My Runshaw API",
     description="The API used by the backend of the My Runshaw app to manage friendships, timetables, push notifications, buses and more. To authenticate with this API, you must provide an Appwrite JWT in the Authorization header.",
     version=getFromEnv("API_VERSION"),
-    on_startup=[app_startup_event],
-    on_shutdown=[app_shutdown_event],
     contact={
         "name": "Daniel Benge",
         "url": "https://danieldb.uk",
@@ -55,6 +61,7 @@ app = FastAPI(
             "description": "Local development server",
         },
     ],
+    lifespan=lifespan,
 )
 
 for router in [
@@ -64,6 +71,7 @@ for router in [
     profilePicsRouter,
     timetableRouter,
     paymentRouter,
+    adminRouter,
 ]:
     app.include_router(router)
 

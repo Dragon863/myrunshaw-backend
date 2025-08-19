@@ -13,3 +13,6 @@ icalendar
 pytz
 redis
 lxml
+httpx
+pytest-asyncio
+asgi-lifespan

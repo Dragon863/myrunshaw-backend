@@ -31,7 +31,6 @@ friendsRouter = APIRouter(
 )
 async def get_friends(
     req: Request,
-    auth_user: dict = Depends(validateToken),
     conn: asyncpg.Connection = Depends(get_db_conn),
 ):
     """Fetch friends for the authenticated user."""
