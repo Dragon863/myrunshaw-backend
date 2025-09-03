@@ -20,10 +20,7 @@ profilePicsRouter = APIRouter(
 async def get_pfp_versions(
     req: Request, body: BatchGetBody, conn: asyncpg.Connection = Depends(get_db_conn)
 ):
-    """This route will be called upon opening the app. It will return the current version of the profile pictures for the users provided in the JSON body under the key "user_ids"""
-    if not body.user_ids:
-        return JSONResponse({"error": "user_ids is required"}, 400)
-
+    """This route will be called upon opening the app. It will return the current version of the profile pictures for the users provided in the JSON body under the key 'user_ids'"""
     versions = await conn.fetch(
         "SELECT user_id, version FROM profile_pics WHERE user_id = ANY($1::text[])",
         body.user_ids,
