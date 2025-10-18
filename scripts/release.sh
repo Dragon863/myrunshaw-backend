@@ -27,19 +27,25 @@ fi
 
 echo "Working directory is clean."
 
-sed -i -E "s|(image: ghcr.io/dragon863/myrunshaw-[a-z-]+):v[0-9]+\.[0-9]+\.[0-9]+|\1:$VERSION|g" $COMPOSE_FILE # bumps version in docker-compose.yml
+sed -i -E "s|(image: ghcr.io/dragon863/myrunshaw-[a-z0-9-]+):v[0-9]+\.[0-9]+\.[0-9]+|\1:$VERSION|g" "$COMPOSE_FILE" || true
+
+# don't commit if there are no changes
+if git diff --quiet HEAD -- "$COMPOSE_FILE"; then
+  echo "No changes in '$COMPOSE_FILE' (image tag already set to $VERSION). Nothing to commit or push."
+  exit 0
+fi
 
 echo "Updated '$COMPOSE_FILE' to use image tag '$VERSION'."
 
-git add $COMPOSE_FILE
+git add "$COMPOSE_FILE"
 git commit -m "chore: Release version $VERSION"
 echo "Committed version bump."
 
 # tag it on git so the action can pick it up
-git tag $VERSION
+git tag "$VERSION"
 echo "Created git tag '$VERSION'."
 
 git push origin main
-git push origin $VERSION
+git push origin "$VERSION"
 echo "Pushed commit and tag to origin."
 echo "🎉 Done! The actions build should now be processing: https://github.com/Dragon863/myrunshaw-backend/actions/workflows/docker-image.yml"
