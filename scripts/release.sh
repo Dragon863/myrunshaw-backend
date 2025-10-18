@@ -8,6 +8,12 @@ if [ -z "$1" ]; then
   exit 1
 fi
 
+# check that version starts with 'v' followed by numbers and dots otherwise the action won't run
+if ! [[ $1 =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "Error: Version must start with 'v' followed by numbers and dots (e.g., v1.2.3)."
+  exit 1
+fi
+
 VERSION=$1
 COMPOSE_FILE="docker-compose.yml"
 
