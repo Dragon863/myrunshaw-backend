@@ -1,0 +1,52 @@
+name: Build & push Docker images
+
+on:
+  push:
+    tags:
+      - 'v*.*.*' # runs when a tag is pushed
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Log in to Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push API image
+        uses: docker/build-push-action@v6
+        with:
+          context: src/api
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/myrunshaw-api:${{ github.ref_name }}
+
+      - name: Build and push Bus Worker image
+        uses: docker/build-push-action@v6
+        with:
+          context: src/bus-worker
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/myrunshaw-bus-worker:${{ github.ref_name }}
+
+      - name: Build and push Name Cache image
+        uses: docker/build-push-action@v6
+        with:
+          context: src/name-cache
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/myrunshaw-name-cache:${{ github.ref_name }}
+          
+      - name: Build and push Sync Engine image
+        uses: docker/build-push-action@v6
+        with:
+          context: src/sync-engine
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/myrunshaw-sync-engine:${{ github.ref_name }}
