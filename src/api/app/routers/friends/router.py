@@ -197,7 +197,7 @@ async def unblock_user(
     try:
         await conn.execute(
             "DELETE FROM blocked_users WHERE blocker_id = $1 AND blocked_id = $2",
-            (req.state.user_id.lower(), blocked_id.lower()),
+            (req.state.user_id.lower(), blocked_id.blocked_id.lower()),
         )
         return JSONResponse({"message": "User unblocked successfully"}, 201)
     except Exception as e:

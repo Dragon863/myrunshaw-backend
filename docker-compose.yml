@@ -1,7 +1,6 @@
 services:
   bus-worker:
-    build: 
-      context: src/bus-worker
+    image: ghcr.io/dragon863/myrunshaw-bus-worker:v1.0.0
     env_file:
       - src/bus-worker/.env
     restart: unless-stopped
@@ -11,8 +10,7 @@ services:
       - TZ=Europe/London
 
   api:
-    build: 
-      context: src/api
+    image: ghcr.io/dragon863/myrunshaw-api:v1.0.0
     env_file:
       - src/api/.env
     restart: unless-stopped
@@ -22,19 +20,17 @@ services:
       - TZ=Europe/London
 
   sync_engine:
-    build: 
-      context: src/sync-engine
+    image: ghcr.io/dragon863/myrunshaw-sync-engine:v1.0.0
     env_file:
       - src/sync-engine/.env
-    restart: no # This is a task run by a cron job daily
+    restart: no
     container_name: myrunshaw-sync-engine
     network_mode: host
     environment:
       - TZ=Europe/London
 
   name_cache:
-    build: 
-      context: src/name-cache
+    image: ghcr.io/dragon863/myrunshaw-name-cache:v1.0.0
     env_file:
       - src/name-cache/.env
     restart: unless-stopped
