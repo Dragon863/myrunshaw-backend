@@ -1,6 +1,6 @@
 services:
   bus-worker:
-    image: ghcr.io/dragon863/myrunshaw-bus-worker:v1.0.2
+    image: ghcr.io/dragon863/myrunshaw-bus-worker:v1.0.3
     env_file:
       - src/bus-worker/.env
     restart: unless-stopped
@@ -10,7 +10,7 @@ services:
       - TZ=Europe/London
 
   api:
-    image: ghcr.io/dragon863/myrunshaw-api:v1.0.2
+    image: ghcr.io/dragon863/myrunshaw-api:v1.0.3
     env_file:
       - src/api/.env
     restart: unless-stopped
@@ -20,7 +20,7 @@ services:
       - TZ=Europe/London
 
   sync_engine:
-    image: ghcr.io/dragon863/myrunshaw-sync-engine:v1.0.2
+    image: ghcr.io/dragon863/myrunshaw-sync-engine:v1.0.3
     env_file:
       - src/sync-engine/.env
     restart: no
@@ -30,7 +30,7 @@ services:
       - TZ=Europe/London
 
   name_cache:
-    image: ghcr.io/dragon863/myrunshaw-name-cache:v1.0.2
+    image: ghcr.io/dragon863/myrunshaw-name-cache:v1.0.3
     env_file:
       - src/name-cache/.env
     restart: unless-stopped
