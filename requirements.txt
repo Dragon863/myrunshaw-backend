@@ -1,7 +1,0 @@
-Flask
-Flask-Limiter
-python-dotenv
-appwrite
-beautifulsoup4
-onesignal-python-api
-flask-cors

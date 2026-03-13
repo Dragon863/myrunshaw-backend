@@ -1,5 +1,0 @@
-psycopg2-binary
-icalendar
-requests
-python-dotenv
-pytz

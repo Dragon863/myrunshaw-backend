@@ -13,6 +13,7 @@ import psycopg2
 import os
 import dotenv
 import pytz
+from urllib.parse import urlparse
 
 dotenv.load_dotenv()
 
@@ -20,8 +21,30 @@ conn = psycopg2.connect(
     f"user=postgres password={os.getenv('DATABASE_PWD')} host=localhost"
 )
 
+ALLOWED_TIMETABLE_HOSTS = {"webservices.runshaw.ac.uk"}
+ALLOWED_TIMETABLE_PATH = "/timetable.ashx"
+
+
+def validate_timetable_url(ics_url: str):
+    parsed = urlparse(ics_url)
+    hostname = (parsed.hostname or "").lower()
+
+    if parsed.scheme != "https":
+        raise ValueError("Only HTTPS timetable URLs are allowed")
+
+    if hostname not in ALLOWED_TIMETABLE_HOSTS:
+        raise ValueError("Timetable URL host is not allowed")
+
+    if parsed.path != ALLOWED_TIMETABLE_PATH:
+        raise ValueError("Timetable URL path is invalid")
+
+    if "id" not in parsed.query:
+        raise ValueError("Timetable URL must include an id query parameter")
+
+
 def parse_timetable(ics_url):
-    response = requests.get(ics_url)
+    validate_timetable_url(ics_url)
+    response = requests.get(ics_url, timeout=10, allow_redirects=False)
     response.raise_for_status()
 
     cal = Calendar.from_ical(response.text)

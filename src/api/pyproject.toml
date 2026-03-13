@@ -1,0 +1,40 @@
+[tool.poetry]
+name = "myrunshaw-api"
+description = "My Runshaw FastAPI backend"
+authors = ["Daniel Benge"]
+package-mode = false
+
+[tool.poetry.dependencies]
+python = ">=3.13,<4.0"
+asyncpg = "*"
+fastapi = { version = ">=0.135.1", extras = ["standard"] }
+pydantic = ">=2.12.5,<3.0.0"
+python-dotenv = "*"
+appwrite = "*"
+gunicorn = "*"
+uvicorn = "*"
+beautifulsoup4 = "*"
+onesignal-python-api = "*"
+aiohttp = "*"
+requests = "*"
+icalendar = "*"
+pytz = "*"
+redis = "*"
+lxml = "*"
+opentelemetry-api = "*"
+opentelemetry-sdk = "*"
+opentelemetry-instrumentation-fastapi = "*"
+opentelemetry-exporter-otlp-proto-http = "*"
+opentelemetry-instrumentation-asyncpg = "*"
+opentelemetry-instrumentation-aiohttp-client = "*"
+opentelemetry-instrumentation-redis = "*"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "*"
+pytest-asyncio = "*"
+asgi-lifespan = "*"
+httpx = "*"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"

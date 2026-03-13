@@ -5,7 +5,11 @@ from onesignal.model.filter import Filter
 import dotenv
 import os
 
+from app.utils.logging import Logger
+
 dotenv.load_dotenv()
+
+logger = Logger("notifications")
 
 onesignal_configuration = onesignal.Configuration(
     app_key=os.environ.get("ONESIGNAL_API_KEY"),
@@ -47,4 +51,9 @@ def sendNotification(
         small_icon=small_icon,
     )
 
-    response = onesignal_api.create_notification(notification)
+    try:
+        response = onesignal_api.create_notification(notification)
+        return response
+    except Exception:
+        logger.exception("Failed to send OneSignal notification")
+        raise

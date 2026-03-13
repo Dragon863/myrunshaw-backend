@@ -4,7 +4,10 @@ This is the backend for the My Runshaw app. It is a RESTful API built using Fast
 
 ## Testing
 
-The main API container can be tested by installing dependencies from requirements.txt, then running the command `pytest`
+The main API container can be tested from `src/api` with Poetry:
+
+- `poetry install --with dev`
+- `poetry run pytest`
 
 ## Deployment
 
@@ -12,4 +15,20 @@ To run the backend, fill out the required environment variables (examples are pr
 
 ## Development
 
-Use `fastapi dev -p 5006` in the `src/api` folder to test the main API; you can update `utils/config.dart` in the main flutter project to point to your dev endpoint for testing
+Use `poetry run fastapi dev -p 5006` in the `src/api` folder to test the main API; you can update `utils/config.dart` in the main flutter project to point to your dev endpoint for testing.
+
+If you want to run the services with local Docker builds instead of the published GHCR images, use the development override:
+
+- `docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build`
+
+This keeps the API and name cache on local source mounts, and runs the API with `fastapi dev` for reload-friendly development.
+
+The bus worker and sync engine are opt-in in development because they are background/one-shot jobs:
+
+- `docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile workers up --build`
+
+The sync engine can also be run on demand:
+
+- `docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm sync_engine`
+
+Note: the Docker setup still expects the existing `.env` files and any external services they point at (for example Postgres and Redis).

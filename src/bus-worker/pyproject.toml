@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "myrunshaw-bus-worker"
+description = "My Runshaw bus worker"
+authors = ["Daniel Benge"]
+package-mode = false
+
+[tool.poetry.dependencies]
+python = ">=3.13,<4.0"
+asyncpg = "*"
+beautifulsoup4 = "*"
+onesignal-python-api = "*"
+requests = "*"
+python-dotenv = "*"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"

@@ -11,9 +11,11 @@ from app.utils.env import getFromEnv
 from app.utils.auth import validateToken
 from app.utils.auth import jwtToken
 from app.utils.db.pool import get_db_conn
+from app.utils.logging import Logger
 
 
 paymentRouter = APIRouter(tags=["Payments"], prefix="/api/payments")
+logger = Logger("payment_router")
 
 
 @paymentRouter.get(
@@ -48,6 +50,9 @@ async def get_balance(
                 )
 
     except Exception:
+        logger.exception(
+            f"Failed to fetch payment timetable association for user {req.state.user_id.lower()}"
+        )
         raise HTTPException(
             status_code=500,
             detail="Please sync your timetable first to use this feature!",
@@ -60,9 +65,20 @@ async def get_balance(
                 response.raise_for_status()
                 html_content = await response.text()
         except asyncio.TimeoutError:
+            logger.warning(
+                f"RunshawPay balance request timed out for user {req.state.user_id.lower()}"
+            )
             raise HTTPException(
                 status_code=408,
                 detail="Request to RunshawPay timed out. Please try again later.",
+            )
+        except aiohttp.ClientError:
+            logger.exception(
+                f"RunshawPay balance request failed for user {req.state.user_id.lower()}"
+            )
+            raise HTTPException(
+                status_code=502,
+                detail="Failed to contact RunshawPay. Please try again later.",
             )
 
     soup = BeautifulSoup(html_content, "html.parser")
@@ -116,6 +132,9 @@ async def get_transactions(
         # The result has already been checked earlier, no need for redundant checks.
 
     except Exception:
+        logger.exception(
+            f"Failed to fetch payment transactions timetable association for user {req.state.user_id.lower()}"
+        )
         raise HTTPException(
             status_code=500,
             detail="An error occurred - please ensure your timetable is synced, and if this persists please report it as a bug in settings",
@@ -180,9 +199,20 @@ async def get_transactions(
 
                 return JSONResponse(transactions_list)
         except asyncio.TimeoutError:
+            logger.warning(
+                f"RunshawPay transactions request timed out for user {req.state.user_id.lower()}"
+            )
             raise HTTPException(
                 status_code=408,
                 detail="Request to RunshawPay timed out. Please try again later.",
+            )
+        except aiohttp.ClientError:
+            logger.exception(
+                f"RunshawPay transactions request failed for user {req.state.user_id.lower()}"
+            )
+            raise HTTPException(
+                status_code=502,
+                detail="Failed to contact RunshawPay. Please try again later.",
             )
 
 
@@ -217,6 +247,9 @@ async def get_deeplink(
                 )
 
     except Exception:
+        logger.exception(
+            f"Failed to fetch payment deeplink timetable association for user {req.state.user_id.lower()}"
+        )
         raise HTTPException(
             status_code=500,
             detail="Timetable not synced",

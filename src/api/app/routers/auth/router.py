@@ -69,13 +69,22 @@ async def close_account(
             "Authorization": f"Bearer {getFromEnv('ONESIGNAL_API_KEY')}",
         }
 
-        response = await aiohttp.ClientSession().delete(url, headers=headers)
-        if response.status != 200:
-            logger.error(f"Failed to delete OneSignal user: {req.state.user_id}")
+        async with aiohttp.ClientSession() as session:
+            async with session.delete(url, headers=headers) as response:
+                if response.status != 200:
+                    logger.error(
+                        f"Failed to delete OneSignal user {req.state.user_id}: HTTP {response.status}"
+                    )
 
         return JSONResponse({"message": "Account deleted successfully"}, 200)
 
-    except Exception as e:
+    except aiohttp.ClientError:
+        logger.exception(
+            f"Failed to contact OneSignal while closing account for user {req.state.user_id}"
+        )
+        return JSONResponse({"error": "Failed to close account"}, 500)
+    except Exception:
+        logger.exception(f"Failed to close account for user {req.state.user_id}")
         return JSONResponse({"error": "Failed to close account"}, 500)
 
 
@@ -151,6 +160,6 @@ async def handle_appwrite_user_change(
                 )
                 return JSONResponse({"message": "Webhook received, user deleted"}, 200)
 
-    except Exception as e:
-        logger.error(f"Error processing webhook: {e}")
+    except Exception:
+        logger.exception("Error processing Appwrite webhook")
         return JSONResponse({"error": "Invalid JSON"}, 400)

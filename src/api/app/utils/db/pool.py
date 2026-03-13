@@ -12,20 +12,29 @@ logger = Logger("db_pool")
 
 
 async def connect_db_internal():
-    return await asyncpg.create_pool(
-        DATABASE_URL,
-        user="postgres",
-        password=getFromEnv("DATABASE_PWD"),
-    )
+    try:
+        return await asyncpg.create_pool(
+            DATABASE_URL,
+            user="postgres",
+            password=getFromEnv("DATABASE_PWD"),
+        )
+    except Exception:
+        logger.exception("Failed to connect to Postgres.")
+        raise
 
 
 async def initialise_db_pool():
     global db_pool
     if db_pool is None:
         logger.info("Initializing database pool...")
-        db_pool = await connect_db_internal()
-        await init_db(db_pool, logger=logger)
-        logger.info("Database pool initialized.")
+        try:
+            db_pool = await connect_db_internal()
+            await init_db(db_pool, logger=logger)
+            logger.info("Database pool initialized.")
+        except Exception:
+            logger.exception("Failed to initialize database pool.")
+            db_pool = None
+            raise
     else:
         logger.info("Database pool already initialized.")
 
@@ -34,9 +43,14 @@ async def close_db_pool():
     global db_pool
     if db_pool:
         logger.info("Closing database pool...")
-        await db_pool.close()
-        db_pool = None
-        logger.info("Database pool closed.")
+        try:
+            await db_pool.close()
+            logger.info("Database pool closed.")
+        except Exception:
+            logger.exception("Failed to close database pool.")
+            raise
+        finally:
+            db_pool = None
 
 
 async def get_db_conn():

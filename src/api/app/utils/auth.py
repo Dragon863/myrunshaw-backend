@@ -1,4 +1,5 @@
 import sys
+import os
 from fastapi import HTTPException, Request
 from appwrite.client import Client
 from fastapi.security import HTTPBearer
@@ -9,7 +10,10 @@ from appwrite.services.users import Users
 
 async def validateToken(req: Request):
     """Authenticate users with their JWT from Appwrite"""
-    if "pytest" in sys.modules:
+    app_env = os.getenv("APP_ENV", "").lower()
+    is_production = app_env in {"prod", "production"}
+
+    if "pytest" in sys.modules and not is_production:
         # Will only every bypass token validation in tests
         auth_header = req.headers.get("Authorization")
         if auth_header and "Bearer" in auth_header:

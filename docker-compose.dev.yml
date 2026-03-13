@@ -1,0 +1,67 @@
+services:
+  api:
+    build:
+      context: ./src/api
+      dockerfile: Dockerfile
+    image: myrunshaw-api:dev
+    command:
+      ["fastapi", "dev", "app/app.py", "--host", "0.0.0.0", "--port", "5006"]
+    volumes:
+      - ./src/api:/app
+    restart: "no"
+    environment:
+      TZ: Europe/London
+      PYTHONUNBUFFERED: "1"
+    network_mode: "host"
+
+  name_cache:
+    build:
+      context: ./src/name-cache
+      dockerfile: Dockerfile
+    image: myrunshaw-name-cache:dev
+    command:
+      [
+        "flask",
+        "--app",
+        "app.py",
+        "run",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "5001",
+        "--debug",
+      ]
+    volumes:
+      - ./src/name-cache:/app
+    restart: "no"
+    environment:
+      TZ: Europe/London
+      PYTHONUNBUFFERED: "1"
+    network_mode: "host"
+  bus-worker:
+    build:
+      context: ./src/bus-worker
+      dockerfile: Dockerfile
+    image: myrunshaw-bus-worker:dev
+    volumes:
+      - ./src/bus-worker:/app
+    restart: "no"
+    profiles:
+      - workers
+    environment:
+      TZ: Europe/London
+      PYTHONUNBUFFERED: "1"
+
+  sync_engine:
+    build:
+      context: ./src/sync-engine
+      dockerfile: Dockerfile
+    image: myrunshaw-sync-engine:dev
+    volumes:
+      - ./src/sync-engine:/app
+    restart: "no"
+    profiles:
+      - workers
+    environment:
+      TZ: Europe/London
+      PYTHONUNBUFFERED: "1"

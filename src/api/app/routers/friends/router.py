@@ -15,6 +15,7 @@ from app.utils.notifications import sendNotification
 from app.utils.auth import validateToken, jwtToken
 from app.utils.db.pool import get_db_conn
 from app.utils.appwrite import get_admin_client
+from app.utils.logging import Logger
 from appwrite.client import Client
 from appwrite.services.users import Users
 
@@ -22,6 +23,7 @@ from appwrite.services.users import Users
 friendsRouter = APIRouter(
     tags=["Friends"],
 )
+logger = Logger("friends_router")
 
 
 @friendsRouter.get(
@@ -44,7 +46,10 @@ async def get_friends(
             req.state.user_id.lower(),
         )
         return [dict(row) for row in rows]
-    except Exception as e:
+    except Exception:
+        logger.exception(
+            f"Failed to fetch friends for user {req.state.user_id.lower()}"
+        )
         raise HTTPException(status_code=500, detail="Failed to fetch friends")
 
 
@@ -65,7 +70,8 @@ async def get_name(
         users = Users(adminClient)
         user: dict = users.get(user_id)
         return JSONResponse({"name": user["name"]})
-    except Exception as e:
+    except Exception:
+        logger.exception(f"Failed to fetch user name for {user_id}")
         return JSONResponse({"error": "User not found"}, status_code=404)
 
 
@@ -131,7 +137,9 @@ async def get_names(
                                 f"{cache_prefix}{user_id}", "Unknown User", ex=600
                             )  # prevents a bunch of requests
                     except Exception as e:
-                        # Consider logging the error e
+                        logger.exception(
+                            f"Failed to fetch Appwrite name for user {user_id}"
+                        )
                         names[user_id] = "Unknown User"
 
         # all requested user_ids must have an entry in the response
@@ -144,8 +152,8 @@ async def get_names(
             media_type="application/json",
             headers={"Content-Type": "application/json; charset=utf-8"},
         )
-    except Exception as e:
-        # Consider logging the error e
+    except Exception:
+        logger.exception("Failed to batch fetch user names")
         return JSONResponse({"error": "Failed to fetch names"}, status_code=500)
 
 
@@ -178,7 +186,10 @@ async def unfriend_user(
             {"message": "User blocked and friendship removed (if applicable)"},
             201,
         )
-    except Exception as e:
+    except Exception:
+        logger.exception(
+            f"Failed to block user {blocked_id_body.blocked_id.lower()} for {req.state.user_id.lower()}"
+        )
         return JSONResponse({"error": "You are not friends with this user"}, 409)
 
 
@@ -200,7 +211,10 @@ async def unblock_user(
             (req.state.user_id.lower(), blocked_id.blocked_id.lower()),
         )
         return JSONResponse({"message": "User unblocked successfully"}, 201)
-    except Exception as e:
+    except Exception:
+        logger.exception(
+            f"Failed to unblock user {blocked_id.blocked_id.lower()} for {req.state.user_id.lower()}"
+        )
         return JSONResponse({"error": "User is not blocked"}, 409)
 
 
@@ -230,7 +244,8 @@ async def send_friend_request(
     try:
         users = Users(adminClient)
         users.get(receiver)
-    except Exception as e:
+    except Exception:
+        logger.exception(f"Invalid friend request receiver {receiver}")
         return JSONResponse({"error": "Invalid receiver_id"}, 404)
 
     try:
@@ -258,7 +273,8 @@ async def send_friend_request(
             small_icon="friend",  # Fun story: this used to default to a bus icon, which seemed vaguely threatening for android users!
         )
         return JSONResponse({"message": "Friend request sent"}, 201)
-    except Exception as e:
+    except Exception:
+        logger.exception(f"Failed to send friend request from {sender} to {receiver}")
         return JSONResponse(
             {"error": "An error occurred while sending the friend request"}, 500
         )
@@ -282,7 +298,10 @@ async def get_friend_requests(
             status,
         )
         return [dict(row) for row in rows]
-    except Exception as e:
+    except Exception:
+        logger.exception(
+            f"Failed to fetch friend requests for user {req.state.user_id}"
+        )
         return JSONResponse({"error": "Failed to fetch friend requests"}, 500)
 
 
@@ -347,5 +366,8 @@ async def handle_friend_request(
                 small_icon="friend",
             )
             return JSONResponse({"message": "Friend request declined"}, 200)
-        except Exception as e:
+        except Exception:
+            logger.exception(
+                f"Failed to decline friend request {request_id} for user {req.state.user_id}"
+            )
             return JSONResponse({"error": "Failed to decline friend request"}, 500)

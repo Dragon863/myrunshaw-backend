@@ -24,8 +24,8 @@ async def initialise_redis_pool():
             )
             await redis_pool.ping()  # check it's actually alive
             logger.info("Redis pool initialized.")
-        except Exception as e:
-            logger.error(f"Failed to initialize Redis pool: {e}")
+        except Exception:
+            logger.exception("Failed to initialize Redis pool.")
             redis_pool = None
     else:
         logger.info("Redis pool already initialized.")
@@ -35,9 +35,14 @@ async def close_redis_pool():
     global redis_pool
     if redis_pool:
         logger.info("Closing Redis pool...")
-        await redis_pool.aclose()
-        redis_pool = None
-        logger.info("Redis pool closed.")
+        try:
+            await redis_pool.aclose()
+            logger.info("Redis pool closed.")
+        except Exception:
+            logger.exception("Failed to close Redis pool.")
+            raise
+        finally:
+            redis_pool = None
 
 
 async def get_redis_conn() -> redis.Redis:
