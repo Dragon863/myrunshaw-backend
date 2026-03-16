@@ -169,28 +169,30 @@ async def unfriend_user(
 ):
     """Unfriends a user by their ID. Route name preserved for backward compatibility"""
 
+    user_id = req.state.user_id.lower()
+    target_id = blocked_id_body.blocked_id.lower()
     try:
-        await conn.execute(
-            """DELETE FROM friend_requests 
-            WHERE (sender_id = $1 AND receiver_id = $2) 
-                OR (sender_id = $2 AND receiver_id = $1)""",
-            req.state.user_id.lower(),
-            blocked_id_body.blocked_id.lower(),
-        )
-        await conn.execute(
-            "INSERT INTO blocked_users (blocker_id, blocked_id) VALUES ($1, $2)",
-            req.state.user_id.lower(),
-            blocked_id_body.blocked_id.lower(),
-        )
+        async with conn.transaction():
+            await conn.execute(
+                """DELETE FROM friend_requests 
+                WHERE (sender_id = $1 AND receiver_id = $2) 
+                    OR (sender_id = $2 AND receiver_id = $1)""",
+                user_id,
+                target_id,
+            )
+            await conn.execute(
+                """INSERT INTO blocked_users (blocker_id, blocked_id) VALUES ($1, $2)
+                ON CONFLICT (blocker_id, blocked_id) DO NOTHING""",
+                user_id,
+                target_id,
+            )
         return JSONResponse(
             {"message": "User blocked and friendship removed (if applicable)"},
             201,
         )
     except Exception:
-        logger.exception(
-            f"Failed to block user {blocked_id_body.blocked_id.lower()} for {req.state.user_id.lower()}"
-        )
-        return JSONResponse({"error": "You are not friends with this user"}, 409)
+        logger.exception(f"Failed to block user {target_id} for {user_id}")
+        raise HTTPException(status_code=500, detail="Failed to block user")
 
 
 @friendsRouter.delete(
@@ -205,17 +207,18 @@ async def unblock_user(
 ):
     """Block a user by their ID."""
 
+    user_id = req.state.user_id.lower()
+    target_id = blocked_id.blocked_id.lower()
     try:
         await conn.execute(
             "DELETE FROM blocked_users WHERE blocker_id = $1 AND blocked_id = $2",
-            (req.state.user_id.lower(), blocked_id.blocked_id.lower()),
+            user_id,
+            target_id,
         )
-        return JSONResponse({"message": "User unblocked successfully"}, 201)
+        return JSONResponse({"message": "User unblocked successfully"}, 200)
     except Exception:
-        logger.exception(
-            f"Failed to unblock user {blocked_id.blocked_id.lower()} for {req.state.user_id.lower()}"
-        )
-        return JSONResponse({"error": "User is not blocked"}, 409)
+        logger.exception(f"Failed to unblock user {target_id} for {user_id}")
+        raise HTTPException(status_code=500, detail="Failed to unblock user")
 
 
 @friendsRouter.post(

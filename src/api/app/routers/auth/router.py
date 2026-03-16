@@ -71,7 +71,7 @@ async def close_account(
 
         async with aiohttp.ClientSession() as session:
             async with session.delete(url, headers=headers) as response:
-                if response.status != 200:
+                if response.status != 201:
                     logger.error(
                         f"Failed to delete OneSignal user {req.state.user_id}: HTTP {response.status}"
                     )
