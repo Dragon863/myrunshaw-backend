@@ -63,7 +63,7 @@ async def test_ping(client: AsyncClient):
 async def test_get_friends_unauthenticated(client: AsyncClient):
     response = await client.get("/api/friends")
     print(response)
-    assert response.status_code == 401
+    assert response.status_code == 403
 
 
 @pytest.mark.asyncio

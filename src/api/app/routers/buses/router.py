@@ -62,7 +62,9 @@ async def get_bus_for(
 
     users = Users(adminClient)
     user = users.get(user_id)
-    preferences: dict = user.get("prefs", {"bus_number": None})
+
+    # preferences: dict = user.get("prefs", {"bus_number": None})
+    preferences = user.prefs
 
     toReturn = []
     if "bus_number" in preferences:
@@ -72,6 +74,14 @@ async def get_bus_for(
 
     for bus in buses:
         toReturn.append(bus["bus"])
+
+    # Also fetch from DB
+    db_buses = await conn.fetch(
+        "SELECT * FROM extra_bus_subscriptions WHERE user_id = $1", user_id.lower()
+    )
+    for bus in db_buses:
+        if not bus["bus"] in toReturn:
+            toReturn.append(bus["bus"])
 
     if len(toReturn) == 0:
         return JSONResponse("Not set")
