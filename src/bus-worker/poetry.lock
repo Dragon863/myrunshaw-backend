@@ -245,14 +245,14 @@ all = ["flake8 (>=7.1.1)", "mypy (>=1.11.2)", "pytest (>=8.3.2)", "ruff (>=0.6.2
 
 [[package]]
 name = "onesignal-python-api"
-version = "2.2.1"
+version = "5.4.0"
 description = "OneSignal"
 optional = false
 python-versions = ">=3.6"
 groups = ["main"]
 files = [
-    {file = "onesignal_python_api-2.2.1-py3-none-any.whl", hash = "sha256:9d5618da4a03361b7ee2d688e49d9f3ed9c1ed34e9067c0cf06916d77b479177"},
-    {file = "onesignal_python_api-2.2.1.tar.gz", hash = "sha256:b2f63b035355ce2085cb9ebddb9bf8ca8242b008d7e3bbfbbc0867da2f3f4378"},
+    {file = "onesignal_python_api-5.4.0-py3-none-any.whl", hash = "sha256:7400dc8901a6a7d6138a7a2b5712dd7d99d354ee35abf5ba75e111b7bbc35345"},
+    {file = "onesignal_python_api-5.4.0.tar.gz", hash = "sha256:d7a0a3b94e15b074af887b3f98876b941e50d3fc9e43671b3510ad52c5b8f88c"},
 ]
 
 [package.dependencies]
@@ -368,4 +368,4 @@ zstd = ["backports-zstd (>=1.0.0) ; python_version < \"3.14\""]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.13,<4.0"
-content-hash = "b6b758b9e9d80ec1f777e5b72b144b217d848eb94b6dbc27078e01e9e7fd29c4"
+content-hash = "bed696a684969bd4f73ff62dcd4a1d9fe9413feb2594c2dd0258228dbb8f30cc"
