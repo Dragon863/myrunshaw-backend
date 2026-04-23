@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from appwrite.client import Client
 from appwrite.services.users import Users
 
-from app.utils.appwrite import get_admin_client
+from app.utils.appwrite import get_admin_client, run_appwrite_call
 from app.utils.auth import validateToken, jwtToken
 from app.utils.db.pool import get_db_conn
 from app.utils.env import getFromEnv
@@ -51,7 +51,7 @@ async def close_account(
     """Close the authenticated user's account."""
     try:
         users = Users(adminClient)
-        users.delete(req.state.user_id)
+        await run_appwrite_call(users.delete, req.state.user_id)
 
         await conn.execute(
             "DELETE FROM users WHERE user_id = $1",
