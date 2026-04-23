@@ -12,7 +12,7 @@ dotenv.load_dotenv()
 logger = Logger("notifications")
 
 onesignal_configuration = onesignal.Configuration(
-    app_key=os.environ.get("ONESIGNAL_API_KEY"),
+    api_key=os.environ.get("ONESIGNAL_API_KEY"),
     # user_key=os.environ.get("ONESIGNAL_USER_KEY"),
 )
 onesignal_api = default_api.DefaultApi(
