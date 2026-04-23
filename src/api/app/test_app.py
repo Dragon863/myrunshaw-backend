@@ -1,7 +1,5 @@
-from asyncio import AbstractEventLoop
 import random
 import uuid
-import asyncpg
 from httpx import AsyncClient, ASGITransport
 import pytest
 import pytest_asyncio
@@ -65,7 +63,7 @@ async def test_ping(client: AsyncClient):
 async def test_get_friends_unauthenticated(client: AsyncClient):
     response = await client.get("/api/friends")
     print(response)
-    assert response.status_code == 403
+    assert response.status_code == 401
 
 
 @pytest.mark.asyncio
