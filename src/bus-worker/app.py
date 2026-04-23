@@ -32,7 +32,7 @@ for var in required_env_vars:
         raise EnvironmentError(f"Missing required environment variable: {var}")
 
 onesignal_configuration = onesignal.Configuration(
-    api_key=os.environ.get("ONESIGNAL_API_KEY"),
+    rest_api_key=os.environ.get("ONESIGNAL_API_KEY"),
     # user_key=os.environ.get("ONESIGNAL_USER_KEY"),
 )
 onesignal_api = default_api.DefaultApi(

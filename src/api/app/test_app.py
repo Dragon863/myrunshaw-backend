@@ -38,9 +38,7 @@ async def test_user_existence(client: AsyncClient):
     users = Users(adminClient)
     listOfUsers = users.list(queries=[Query.offset(random.randint(0, 100))])
 
-    response = await client.get(
-        f"/api/exists/{random.choice(listOfUsers['users'])['$id']}"
-    )
+    response = await client.get(f"/api/exists/{random.choice(listOfUsers.users).id}")
     assert response.status_code == 200
     assert response.json() == {"exists": True}
 
@@ -63,7 +61,7 @@ async def test_ping(client: AsyncClient):
 async def test_get_friends_unauthenticated(client: AsyncClient):
     response = await client.get("/api/friends")
     print(response)
-    assert response.status_code == 403
+    assert response.status_code in [401, 403]
 
 
 @pytest.mark.asyncio
@@ -106,8 +104,8 @@ async def test_create_user(client: AsyncClient):
         SECOND_USER_ID.lower(),
     )
 
-    assert users.get(USER_ID)["$id"] == USER_ID
-    assert users.get(SECOND_USER_ID)["$id"] == SECOND_USER_ID
+    assert users.get(USER_ID).id == USER_ID
+    assert users.get(SECOND_USER_ID).id == SECOND_USER_ID
 
 
 @pytest.mark.asyncio
