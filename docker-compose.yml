@@ -38,3 +38,13 @@ services:
     network_mode: host
     environment:
       - TZ=Europe/London
+
+  exam-notifs:
+    image: ghcr.io/dragon863/myrunshaw-exam-notifs:v1.2.1
+    env_file:
+      - src/exam-notifs/.env
+    restart: unless-stopped
+    container_name: myrunshaw-exam-notifs
+    network_mode: host
+    environment:
+      - TZ=Europe/London

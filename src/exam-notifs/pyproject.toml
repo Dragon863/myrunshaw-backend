@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "myrunshaw-exam-notifs"
+description = "My Runshaw exam notifications worker - send notifications on the day of students' exams"
+authors = ["Daniel Benge"]
+package-mode = false
+
+[tool.poetry.dependencies]
+python = ">=3.13,<4.0"
+asyncpg = "*"
+onesignal-python-api = "5.4.0"
+python-dotenv = "*"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"

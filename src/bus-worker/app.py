@@ -10,12 +10,50 @@ import onesignal
 from onesignal.api import default_api
 from onesignal.model.notification import Notification
 from onesignal.model.filter import Filter
+import logging
+import logging.handlers
+import sys
 
 dotenv.load_dotenv()
 
 BASE_URL = os.getenv("BASE_URL")
-DEBUG = False
+# Allow enabling debug via environment (useful in containers)
+DEBUG = os.getenv("DEBUG", "false").lower() == "true"
 DATABASE = None
+
+
+def setup_logging():
+    level_name = os.getenv("LOG_LEVEL", "DEBUG" if DEBUG else "INFO").upper()
+    level = getattr(logging, level_name, logging.INFO)
+
+    logger = logging.getLogger("bus_worker")
+    logger.setLevel(level)
+
+    fmt = logging.Formatter(
+        "%(asctime)s %(levelname)s [%(name)s] %(message)s", "%Y-%m-%dT%H:%M:%S%z"
+    )
+
+    # Console handler
+    ch = logging.StreamHandler(sys.stdout)
+    ch.setLevel(level)
+    ch.setFormatter(fmt)
+    logger.addHandler(ch)
+
+    # Optional file handler
+    log_file = os.getenv("LOG_FILE")
+    if log_file:
+        fh = logging.handlers.RotatingFileHandler(
+            log_file,
+            maxBytes=int(os.getenv("LOG_MAX_BYTES", 10 * 1024 * 1024)),
+            backupCount=int(os.getenv("LOG_BACKUP_COUNT", 5)),
+        )
+        fh.setLevel(level)
+        fh.setFormatter(fmt)
+        logger.addHandler(fh)
+
+
+setup_logging()
+logger = logging.getLogger("bus_worker")
 
 required_env_vars = [
     "ONESIGNAL_API_KEY",
@@ -71,10 +109,16 @@ def sendNotification(
         small_icon=small_icon,
     )
     if DEBUG:
-        print(notification)
-    else:
+        logger.debug("Prepared notification: %s", notification)
+        return
+
+    try:
         response = onesignal_api.create_notification(notification)
-        # print(response)
+        logger.debug("OneSignal response: %s", getattr(response, "__dict__", response))
+        return response
+    except Exception:
+        logger.exception("Failed to send OneSignal notification")
+        return None
 
 
 async def prepareDB():
@@ -84,7 +128,7 @@ async def prepareDB():
         user="postgres",
         password=os.getenv("DATABASE_PWD"),
     )
-    print("--- DB is online ---")
+    logger.info("DB pool prepared and online")
 
 
 async def parseSite():
@@ -95,7 +139,7 @@ async def parseSite():
         },
     )
     if response.status_code != 200:
-        print(f"Failed to load page: Status code {response.status_code}")
+        logger.error("Failed to load page: Status code %s", response.status_code)
         return
 
     soup = BeautifulSoup(response.content, "html.parser")
@@ -143,7 +187,9 @@ async def parseSite():
 
             # Check if bay has changed, also we should probably ignore transitions to "0"
             if old_bay != new_bay and new_bay != "0":
-                print(f"Bus {bus_id} changed from bay {old_bay} to bay {new_bay}")
+                logger.info(
+                    "Bus %s changed from bay %s to bay %s", bus_id, old_bay, new_bay
+                )
                 if old_bay == "0":
                     message = f"The {bus_id} has arrived in bay {new_bay}"
                 else:
@@ -160,6 +206,8 @@ async def parseSite():
                         ),
                     ],
                     channel=os.getenv("ONESIGNAL_BUS_CHANNEL"),
+                    ttl=40 * 60,
+                    # Buses start arriving at ~15:15, leave at 15:55, so 40 minutes is reasonable
                 )
 
                 # Now check the extra bus subscriptions
@@ -176,16 +224,17 @@ async def parseSite():
                         userIds=ids,
                         title="Bus Update!",
                         channel=os.getenv("ONESIGNAL_BUS_CHANNEL"),
+                        ttl=40 * 60,
                     )
 
 
 async def runLoop():
     if DEBUG:
-        print(
-            "\x1b[31m****WARNING: DEBUG MODE ENABLED. DO NOT USE IN PRODUCTION!! ****\x1b[0m"
+        logger.warning(
+            "****WARNING: DEBUG MODE ENABLED. DO NOT USE IN PRODUCTION!! ****"
         )
     else:
-        print("\x1b[32m**** Bus Worker is online in PRODUCTION env! ****\x1b[0m")
+        logger.info("Bus Worker is online in PRODUCTION env")
     await prepareDB()
     notified_admins = False
 
@@ -208,8 +257,8 @@ async def runLoop():
             else:
                 notified_admins = False
 
-        except Exception as e:
-            print(f"Error in main loop: {e}")
+        except Exception:
+            logger.exception("Error in main loop")
 
         await asyncio.sleep(10)
 
