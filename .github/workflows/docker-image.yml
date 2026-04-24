@@ -56,3 +56,10 @@ jobs:
           context: src/sync-engine
           push: true
           tags: ghcr.io/${{ env.OWNER_LC }}/myrunshaw-sync-engine:${{ github.ref_name }}
+
+      - name: Build and push Exam Notifs image
+        uses: docker/build-push-action@v6
+        with:
+          context: src/exam-notifs
+          push: true
+          tags: ghcr.io/${{ env.OWNER_LC }}/myrunshaw-exam-notifs:${{ github.ref_name }}
