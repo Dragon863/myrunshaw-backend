@@ -69,7 +69,7 @@ async def get_name(
     try:
         users = Users(adminClient)
         user: dict = users.get(user_id)
-        return JSONResponse({"name": user["name"]})
+        return JSONResponse({"name": user.name})
     except Exception:
         logger.exception(f"Failed to fetch user name for {user_id}")
         return JSONResponse({"error": "User not found"}, status_code=404)

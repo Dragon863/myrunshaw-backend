@@ -60,7 +60,7 @@ async def getUserInfo(
             name = await redisConn.get(f"user_name:{otherUserID}")
             if name is not None:
                 user: dict = await asyncio.to_thread(users.get, otherUserID)
-                name = user["name"] if user else None
+                name = user.name if user else None
                 if name:
                     await redisConn.set(f"user_name:{otherUserID}", name)
                 if name:
@@ -97,7 +97,7 @@ async def getUserInfo(
     name = await redisConn.get(f"user_name:{user_id}")
     if name is None:
         user: dict = await asyncio.to_thread(users.get, user_id)
-        name = user["name"] if user else None
+        name = user.name if user else None
         if name:
             await redisConn.set(f"user_name:{user_id}", name)
         else:
