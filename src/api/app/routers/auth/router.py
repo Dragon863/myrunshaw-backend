@@ -14,12 +14,48 @@ from app.utils.auth import validateToken, jwtToken
 from app.utils.db.pool import get_db_conn
 from app.utils.env import getFromEnv
 from app.utils.logging import Logger
-
+from app.utils.models import WifiSpeedTestResultSubmission
 
 authRouter = APIRouter(
     tags=["Auth"],
 )
 logger = Logger("auth_router")
+
+
+@authRouter.post(
+    "/api/surveys/wifi-speed-test/results",
+    tags=["Surveys"],
+)
+async def submit_wifi_speed_test_results(
+    result: WifiSpeedTestResultSubmission,
+    conn: asyncpg.Connection = Depends(get_db_conn),
+):
+    """Store a wifi speed test survey response."""
+    try:
+        await conn.execute(
+            """
+            INSERT INTO wifi_speed_test_results (
+                download_speed_mbps,
+                upload_speed_mbps,
+                ping_times_ms,
+                mean_latency_ms,
+                jitter_ms,
+                platform,
+                bssid
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+            """,
+            result.download_speed_mbps,
+            result.upload_speed_mbps,
+            result.ping_times_ms,
+            result.mean_latency_ms,
+            result.jitter_ms,
+            result.platform,
+            result.bssid.lower() if result.bssid else None,
+        )
+        return JSONResponse({"message": "Survey response submitted successfully"}, 201)
+    except Exception:
+        logger.exception("Failed to store wifi speed test survey response")
+        return JSONResponse({"error": "Failed to submit survey response"}, 500)
 
 
 @authRouter.get(

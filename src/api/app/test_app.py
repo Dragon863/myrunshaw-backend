@@ -38,7 +38,9 @@ async def test_user_existence(client: AsyncClient):
     users = Users(adminClient)
     listOfUsers = users.list(queries=[Query.offset(random.randint(0, 100))])
 
-    response = await client.get(f"/api/exists/{random.choice(listOfUsers.users).id}")
+    response = await client.get(
+        f"/api/exists/{random.choice(getattr(listOfUsers, 'users')).id}"
+    )
     assert response.status_code == 200
     assert response.json() == {"exists": True}
 
@@ -104,8 +106,8 @@ async def test_create_user(client: AsyncClient):
         SECOND_USER_ID.lower(),
     )
 
-    assert users.get(USER_ID).id == USER_ID
-    assert users.get(SECOND_USER_ID).id == SECOND_USER_ID
+    assert getattr(users.get(USER_ID), "id") == USER_ID
+    assert getattr(users.get(SECOND_USER_ID), "id") == SECOND_USER_ID
 
 
 @pytest.mark.asyncio
@@ -133,6 +135,32 @@ async def test_onboarding_flow_routes(client: AsyncClient):
         headers=HEADERS_USER1,
     )
     assert response.status_code == 201
+
+
+@pytest.mark.asyncio
+async def test_submit_wifi_speed_test_results(client: AsyncClient):
+    payload = {
+        "downloadSpeedMbps": 21.516147483167682,
+        "uploadSpeedMbps": 12.483047619047618,
+        "pingTimesMs": [226.0, 74.0, 205.0, 99.0, 200.0],
+        "meanLatencyMs": 160.8,
+        "jitterMs": 59.44,
+        "platform": "android",
+        "bssid": "08:b4:b1:76:03:5b",
+    }
+
+    response = await client.post("/api/surveys/wifi-speed-test/results", json=payload)
+    assert response.status_code == 201
+    assert response.json() == {"message": "Survey response submitted successfully"}
+
+    db_gen = get_db_conn()
+    db_conn = await anext(db_gen)
+    row = await db_conn.fetchrow(
+        "SELECT * FROM wifi_speed_test_results ORDER BY id DESC LIMIT 1"
+    )
+    assert row is not None
+    assert row["platform"] == "android"
+    assert row["bssid"] == "08:b4:b1:76:03:5b"
 
 
 @pytest.mark.asyncio
