@@ -37,6 +37,10 @@ MESSAGES = [
     "Best of luck on your exam today!",
     "Wishing you all the best on your exam today :)",
     "All the best for your exam - stay focused and do your best!",
+    "You've got this!! 🔥",
+    "Good luck on your exam - stay calm and do your best!",
+    "Good luck - you've worked hard, and you're going to do amazingly! 😎",
+    "Best of luck today - time for all your hard work to pay off!",
 ]
 
 required_env_vars = [
