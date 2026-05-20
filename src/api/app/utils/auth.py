@@ -6,11 +6,10 @@ from appwrite.client import Client
 from appwrite.exception import AppwriteException
 from fastapi.security import HTTPBearer
 from app.utils.env import getFromEnv
-from app.utils.appwrite import run_appwrite_call
+from app.utils.appwrite import run_appwrite_call, get_admin_client
 from app.utils.logging import Logger
 from appwrite.services.account import Account
 from appwrite.services.users import Users
-
 
 logger = Logger("auth")
 
@@ -85,16 +84,50 @@ async def validateToken(req: Request):
 async def isAdmin(req: Request):
     authedUser = await validateToken(req)
 
-    adminClient = Client()
-    adminClient.set_endpoint(getFromEnv("APPWRITE_ENDPOINT"))
-    adminClient.set_project(getFromEnv("APPWRITE_PROJECT_ID"))
-    adminClient.set_key(getFromEnv("APPWRITE_API_KEY"))
+    adminClient = get_admin_client()
 
     users = Users(adminClient)
-    result = await run_appwrite_call(users.list_memberships, user_id=authedUser.id)
 
-    for membership in result.memberships:
-        if membership.teamid == getFromEnv("APPWRITE_ADMIN_TEAM_ID"):
+    memberships = None
+    try:
+        result = await run_appwrite_call(users.list_memberships, user_id=authedUser.id)
+        # SDK may return a model object with `.memberships` or a dict-like result (bad, I know!)
+        if hasattr(result, "memberships"):
+            memberships = result.memberships
+        elif isinstance(result, dict):
+            memberships = result.get("memberships", [])
+    except AppwriteException as e:
+        # Appwrite SDK sometimes fails Pydantic validation for newer/partial fields - awaiting upstream fix
+        # Fall back to raw client call to get the JSON payload and inspect memberships.
+        logger.warning(
+            f"Appwrite membership parse failed, falling back to raw call: {e}"
+        )
+        try:
+            raw = await run_appwrite_call(
+                adminClient.call, "get", f"/users/{authedUser.id}/memberships"
+            )
+            import json
+
+            if isinstance(raw, str):
+                raw = json.loads(raw)
+            if isinstance(raw, dict):
+                memberships = raw.get("memberships", [])
+        except Exception as e2:
+            logger.warning(f"Raw memberships call failed: {e2}")
+            memberships = []
+
+    if not memberships:
+        raise HTTPException(status_code=403, detail="Forbidden; not an admin!")
+
+    for membership in memberships:
+        # same situation as above
+        teamid = None
+        if hasattr(membership, "teamid"):
+            teamid = membership.teamid
+        elif isinstance(membership, dict):
+            teamid = membership.get("teamid") or membership.get("teamId")
+
+        if teamid == getFromEnv("APPWRITE_ADMIN_TEAM_ID"):
             return True
 
     raise HTTPException(status_code=403, detail="Forbidden; not an admin!")

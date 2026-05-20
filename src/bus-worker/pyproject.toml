@@ -8,7 +8,7 @@ package-mode = false
 python = ">=3.13,<4.0"
 asyncpg = "*"
 beautifulsoup4 = "*"
-onesignal-python-api = "5.4.0"
+onesignal-python-api = "5.5.0"
 requests = "*"
 python-dotenv = "*"
 

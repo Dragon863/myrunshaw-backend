@@ -15,7 +15,7 @@ To run the backend, fill out the required environment variables (examples are pr
 
 ## Development
 
-Use `poetry run fastapi dev -p 5006` in the `src/api` folder to test the main API; you can update `utils/config.dart` in the main flutter project to point to your dev endpoint for testing.
+Use `poetry run fastapi dev --port 5006` in the `src/api` folder to test the main API; you can update `utils/config.dart` in the main flutter project to point to your dev endpoint for testing.
 
 If you want to run the services with local Docker builds instead of the published GHCR images, use the development override:
 
