@@ -1,3 +1,6 @@
+> [!WARNING]  
+> This is deprecated, the current version in use is written in .NET and can be found at [MyRunshawApi](https://github.com/dragon863/MyRunshawApi). This version is archived for reference but is not in use in production
+
 # My Runshaw backend
 
 This is the backend for the My Runshaw app. It is a RESTful API built using FastAPI and postgres, documentation is available at [this link](https://runshaw-api.danieldb.uk/docs). All auth is handled by using an Appwrite JWT token. Feel free to use this for your own purposes!
